@@ -4,9 +4,9 @@ Ver.0.29a4。BVE Trainsimの路線と車両を選び、BVE5またはBVE6を起�
 
 ## ダウンロード
 
-[導入用EXEをダウンロード](https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29a4/BVE6Launcher-Setup.exe)
+**安全性確認のため、Ver.0.29a4の配布を一時停止しています（2026年10月27日）。**
 
-EXEを開き、利用規約に同意したうえでインストール先などを選んでください。インターネット接続が必要です。管理者権限の確認が表示されます。EXEには電子署名がないため、Windowsに発行元不明の警告が表示される場合があります。
+`BVE6Launcher-Setup.exe` について、Microsoft Defenderによる `Trojan:Win32/Wacatac.H!ml` の検出が報告されています。現在調査中であり、誤検知かどうかは確認できていません。安全性が確認できるまでダウンロード・実行を控えてください。
 
 **個人・非営利利用に限ります。収益化した動画や配信での利用も、規約上の商用利用に含まれます。** 詳細は[利用規約](LICENSE.txt)をご確認ください。独自部分の個人利用を目的とした改造は可能ですが、再配布や改造版の公開は禁止しています。第三者部分にはそれぞれのライセンスが優先されます。
 
