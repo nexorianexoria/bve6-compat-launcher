@@ -1,0 +1,36 @@
+﻿第三者ソフトウェアと参考資料
+
+■ bve-plugin-bridge
+作者：magicant
+https://github.com/magicant/bve-plugin-bridge
+ライセンス：The Unlicense
+
+配布物のbridge/Bve5VehicleCompatibility_.dllと
+bridge/Bve5VehicleCompatibility.exeは、上記由来の改変コードを含みます。
+ライセンス本文はbridge/LICENSE.txtに同梱しています。
+環境変数によるATS指定、イベント・異常終了ログ、通信待機処理、COM初期化、
+配列の余裕確保など、以前の互換実験での改変を引き継いでいます。
+今回の再構築では強制音声テストを除去し、配布用ホストのデバッグパスを除去しました。
+作者が本配布物の動作を保証・推奨していることを示すものではありません。
+
+■ BVE Trainsim / BveEX
+別途必要となる場合があるソフトウェアです。これらの本体は同梱していません。
+https://bvets.net/
+https://bveex.okaoka-depot.com/
+BveEXの公開リポジトリにはPolyForm Noncommercial License 1.0.0と記載されています。レガシーモードは別扱いのため、利用する版と提供元の条件を確認してください。
+https://github.com/automatic9045/BveEX
+
+■ BveScenarioSearch
+作者リポジトリ：https://gitlab.com/hamatetsu_train/bvesoftwares
+シナリオ・車両を選んでBVEを起動する利用の流れを参考にしています。
+本配布物はBveScenarioSearchの改造版ではなく、そのバイナリやコードは同梱していません。
+
+■ 車両・路線・ATS・音声データ
+各作者のデータは同梱していません。
+作業コピーを含む「作業データ」フォルダを公開ZIPへ追加しないでください。
+
+■ 追加取得する互換処理用ファイル
+実装上の対象コンポーネント名：MotorMaster
+配布元の案内：https://sites.google.com/view/fwchbve/top/bveデーター公開一覧/MotorMaster
+対象ファイルは本ZIPに同梱せず、本ソフトから自動取得もしません。利用者が作者の配布ページと利用条件を確認して入手し、明示的に登録します。
+名称・取得元の記載は出典と取得動作の説明であり、特定の車両・路線データの対応保証や、作者による公認・推奨を示しません。
