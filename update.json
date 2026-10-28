@@ -1,5 +1,6 @@
 {
-    "version":  "0.2.9.4",
-    "url":  "https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29a3/BVE6Launcher-package.zip",
-    "sha256":  "E252200B0FDA7B9942A79C12ACC00651DB9B154EF8C211203B408F713540EC94"
+  "version": "0.2.9.5",
+  "displayVersion": "0.29a4",
+  "url": "https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29a4/BVE6Launcher-package.zip",
+  "sha256": "C44D9A8D6A3CF3782DB01D7A112E41625BD8C03A7A6CB5E99911657102EB1699"
 }
