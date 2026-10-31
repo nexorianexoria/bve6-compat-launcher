@@ -1,7 +1,7 @@
 {
-  "version": "0.2.9.12",
-  "displayVersion": "0.29b1",
-  "url": "https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29b1/BVE6Launcher-package.zip",
-  "sha256": "35EFE0F03A86B6433C36783BE95F01C1E148B766F3C338ABC47C3E46FB2AC391",
-  "notes": "利用規約を更新し、規約の表示と更新後の起動選択を追加しました。"
+  "version": "0.2.9.13",
+  "displayVersion": "0.29b2",
+  "url": "https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29b2/BVE6Launcher-package.zip",
+  "sha256": "1777DB8C94244E443FC1F827C324A487B7861431B887576377D2F91785D218F3",
+  "notes": "設定画面と更新後の旧版整理を追加し、規約の表示を改善しました。"
 }
