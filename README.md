@@ -4,7 +4,7 @@
 
 ## ダウンロード・導入
 
-1. [導入用EXEをダウンロード](https://github.com/nexorianexoria/bve6-compat-launcher/releases/download/v0.29a8/BVE6Launcher-Setup.exe)します。[過去のバージョン](https://github.com/nexorianexoria/bve6-compat-launcher/releases)も利用できます。
+1. [最新版のダウンロードページ](https://github.com/nexorianexoria/bve6-compat-launcher/releases/latest)を開き、Assets（添付ファイル）から **BVE6Launcher-Setup.exe** をダウンロードします。[過去のバージョン](https://github.com/nexorianexoria/bve6-compat-launcher/releases)も利用できます。
 2. EXEを開き、利用規約に同意して、インストール先やショートカットの設定を選びます。
 3. 管理者権限の確認後、GitHubから必要なファイルを取得して導入します。インターネット接続と.NET Framework 4.8が必要です。
 
