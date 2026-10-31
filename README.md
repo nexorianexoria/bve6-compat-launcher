@@ -1,3 +1,11 @@
+## Ver.0.29b4 試験版のダウンロード（独立配布）
+
+正式版b3はそのままに、b4の先行試験版を別ブランチで公開しています。インストーラーではありません。ZIPを別フォルダーに展開し、同梱の利用規約をご確認ください。FPS改善は未検証です。
+
+- [b4 実行用ZIP](https://github.com/nexorianexoria/bve6-compat-launcher/raw/refs/heads/preview/0.29b4/downloads/0.29b4/BVE6Launcher-0.29b4-preview.zip)
+- [b4 ソースコードZIP](https://github.com/nexorianexoria/bve6-compat-launcher/raw/refs/heads/preview/0.29b4/downloads/0.29b4/BVE6Launcher-0.29b4-source.zip)
+
+詳細は [b4リリースノート](RELEASE_NOTES_0.29b4.md) を参照してください。
 > **先行試験版 Ver.0.29b4**：運転中のランチャー負荷を減らす試作版です。使用にはZIPの手動展開が必要で、実際のFPS改善はまだ検証中です。正式版0.29b3のインストーラー・自動更新は変更していません。詳しくは [b4リリースノート](RELEASE_NOTES_0.29b4.md) を参照してください。
 # BVE5 Vehicle Compatibility for BVE6 / BVE 起動ランチャー
 

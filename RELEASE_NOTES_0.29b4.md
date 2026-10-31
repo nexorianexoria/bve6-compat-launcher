@@ -27,7 +27,8 @@ Ver.0.29b4は、BVE6互換ランチャーの**先行試験版**です。既存�
 利用条件は同梱のLICENSE.txt、第三者ソフトウェアについてはTHIRD_PARTY_NOTICES.txtを参照してください。診断ログにはファイルの保存場所等が含まれる場合があります。公開する際は個人情報を確認してください。
 
 ### 配布物
-- BVE6Launcher-0.29b4-preview.zip：実行用ファイル一式。手動で展開して起動します。
-- BVE6Launcher-0.29b4-source.zip：ソースコードとFPS計測用スクリプト。
+- [BVE6Launcher-0.29b4-preview.zip](https://github.com/nexorianexoria/bve6-compat-launcher/raw/refs/heads/preview/0.29b4/downloads/0.29b4/BVE6Launcher-0.29b4-preview.zip)：実行用ファイル一式。手動で展開して起動します。
+- [BVE6Launcher-0.29b4-source.zip](https://github.com/nexorianexoria/bve6-compat-launcher/raw/refs/heads/preview/0.29b4/downloads/0.29b4/BVE6Launcher-0.29b4-source.zip)：ソースコードとFPS計測用スクリプト。
 
 正式版b3のインストーラーと自動更新情報は変更しません。
+※配布ZIPはpreview/0.29b4ブランチからの先行配布です。GitHub Releasesへの試験版登録は未実施です。
