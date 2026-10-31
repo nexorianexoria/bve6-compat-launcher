@@ -1,6 +1,7 @@
 {
-  "version": "0.2.9.10",
-  "displayVersion": "0.29a9",
-  "url": "https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29a9/BVE6Launcher-package.zip",
-  "sha256": "FC31187C58CD83FB20E086D337CB3AEC20F8915D764F6205E8389B39CA80751B"
+  "version": "0.2.9.11",
+  "displayVersion": "0.29a10",
+  "url": "https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29a10/BVE6Launcher-package.zip",
+  "sha256": "747BB2FFD17E1CE2DADF074CDBAFEFACF1C2CAE680F28EB9804E6C1702550C02",
+  "notes": "一覧の表示を見やすくし、更新のお知らせを改善しました。"
 }
