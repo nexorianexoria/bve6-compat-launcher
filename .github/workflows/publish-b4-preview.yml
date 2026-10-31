@@ -1,0 +1,46 @@
+name: Publish b4 preview release
+
+on:
+  push:
+    branches: [preview/0.29b4]
+    paths:
+      - ".github/workflows/publish-b4-preview.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: github.repository == 'nexorianexoria/bve6-compat-launcher'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out preview files
+        uses: actions/checkout@v4
+        with:
+          ref: preview/0.29b4
+          persist-credentials: false
+      - name: Verify required assets and version tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          test -s downloads/0.29b4/BVE6Launcher-0.29b4-preview.zip
+          test -s downloads/0.29b4/BVE6Launcher-0.29b4-source.zip
+          gh api repos/"$GITHUB_REPOSITORY"/git/ref/tags/v0.29b4 --silent
+      - name: Publish GitHub Release (keep b3 as stable)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view v0.29b4 >/dev/null 2>&1; then
+            echo "Release exists; no changes made."
+            exit 0
+          fi
+          gh release create v0.29b4 \
+            downloads/0.29b4/BVE6Launcher-0.29b4-preview.zip \
+            downloads/0.29b4/BVE6Launcher-0.29b4-source.zip \
+            --title "Ver.0.29b4 — 運転中の負荷軽減（試験版）" \
+            --notes-file RELEASE_NOTES_0.29b4_SHORT.md \
+            --prerelease \
+            --verify-tag
