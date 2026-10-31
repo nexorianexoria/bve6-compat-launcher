@@ -1,0 +1,45 @@
+Ver.0.29b4 FPS diagnostic scripts (development only)
+
+1. Start BVE5 or BVE6, load the same route and vehicle for each test.
+2. The PresentMon CLI in benchmarks\tools is signed and downloaded from Intel's official GitHub release v2.5.1.
+3. Open Windows PowerShell as administrator. Do not disable Windows protection.
+4. Run:
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\benchmarks\CaptureBveFps.ps1" -Seconds 30
+5. The output CSV is saved under benchmarks\results.
+6. Summarize using:
+   powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\benchmarks\SummarizeBveFps.ps1" -CsvPath "PATH_TO_CSV"
+
+Only capture when you are ready. This is not an auto-starting background monitor.
+PresentMon needs elevation to access ETW events. The launcher does not elevate itself.
+First real capture: results\BVE-FPS-20261031-205322.csv (30 seconds, 2 swap chains).
+The analyzer now reports each swap chain separately; never combine FPS across different swap chains.
+This CSV alone cannot identify which swap chain maps to the visible BVE driving window.
+To compare versions, use the same route/vehicle, camera and scene.
+Window identification (BVE + PanelViewEX):
+- Ensure the train is stopped in a safe TEST scene; do not run this while driving.
+- BVE must be running with the driving window and PanelViewEX visible.
+- Open your own PowerShell as administrator. Then run:
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\benchmarks\IdentifyBveWindow.ps1" -Seconds 15
+- Follow three prompts: both visible, PanelViewEX manually minimized, PanelViewEX manually restored.
+- The script never changes window state itself. The user controls minimize/restore.
+- It saves 3 PresentMon CSVs and window-comparison.csv under benchmarks\results\window-isolation-<timestamp>.
+- If exactly one swap chain stops/slows strongly when PanelViewEX is minimized and recovers afterward, it is the PanelViewEX-correlated candidate; the other continuing series may correspond to driving, but window IDs are not proven by PresentMon CSV.
+- If both change or do not change, do not guess which swap chain is the driving display.
+- For b3/b4 performance comparisons, capture the same route/vehicle/view and use only the identified relevant swap-chain series. Never combine different swap chains or compare different scenes.
+b3 vs b4 (after identifying the driving-window swap chain in EACH run):
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\benchmarks\CompareBveRuns.ps1" -BeforeCsv "B3.csv" -BeforeSwapChain "0x..." -AfterCsv "B4.csv" -AfterSwapChain "0x..."
+The swap chain addresses can change when BVE restarts. Select each recording explicitly.
+The comparison only makes sense when the route, vehicle, view and driving segment match.
+BVE driving window isolation (NEW):
+- Start one BVE instance, load the route and stop the train in a test scene.
+- Keep the BVE driving window and PanelViewEX visible initially.
+- Use administrator PowerShell:
+  powershell.exe -NoProfile -ExecutionPolicy Bypass -File ".\benchmarks\IdentifyBveDrivingWindow.ps1" -Seconds 15
+- Phase 1: both windows visible; press Enter.
+- Phase 2: MANUALLY minimize ONLY BVE driving window. PanelViewEX must stay visible; otherwise enter q and cancel. Press Enter.
+- Phase 3: MANUALLY restore the BVE driving window, keep the same scene; press Enter.
+- Output: benchmarks\results\driving-isolation-<timestamp> with three CSV files and a comparison.
+- This script never minimizes, focuses or restores windows itself.
+- If neither chain stops/slows markedly, the result is INCONCLUSIVE; do not infer which visible window matches a chain.
+- If the BVE process terminates, discard the measurements. Swap-chain addresses are NOT stable across BVE restarts.
+- Combine the findings carefully with the earlier PanelViewEX test; do NOT assume chain addresses match across separate runs.

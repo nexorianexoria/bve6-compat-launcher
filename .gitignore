@@ -1,0 +1,7 @@
+obj/
+dist/
+benchmarks/results/
+*.tmp
+
+dist-fps/
+benchmarks/tools/
