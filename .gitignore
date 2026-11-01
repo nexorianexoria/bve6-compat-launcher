@@ -12,6 +12,7 @@ dist-b7-ui/
 dist-b7-cards/
 dist-b7-release/
 dist-b8-release/
+dist-b9-release/
 benchmarks/__pycache__/
 *.pyc
 src/bridge/**/Release/

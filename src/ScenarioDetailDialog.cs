@@ -33,6 +33,9 @@ internal sealed class ScenarioDetailDialog : Form {
     private readonly Button saveRouteName=new Button();
     private readonly Label routeEditorInfo=new Label();
     private readonly Button clearVehicle=new Button();
+    private readonly Button otherVehicle=new Button();
+    private readonly List<CatalogItem> allVehicles;
+    private string externalVehiclePath;
     private TableLayoutPanel routeColumn,routeEditorPanel;
     private readonly Button[] startButtons=new Button[3];
     private readonly string scenario;
@@ -58,8 +61,10 @@ internal sealed class ScenarioDetailDialog : Form {
         return items;
     }
 
-    internal ScenarioDetailDialog(string path) {
+    internal ScenarioDetailDialog(string path):this(path,null){}
+    internal ScenarioDetailDialog(string path,IEnumerable<CatalogItem> availableVehicles) {
         scenario=Path.GetFullPath(path);
+        allVehicles=(availableVehicles??Enumerable.Empty<CatalogItem>()).ToList();
         var source=Program.Read(scenario);
         if(source.Length==0||!Program.ScenarioHeader(source[0]))
             throw new InvalidDataException("このファイルはBVEシナリオではありません。");
@@ -91,7 +96,10 @@ internal sealed class ScenarioDetailDialog : Form {
         BuildVehicleColumn(columns,vehicles,vehicleSpec);
         BuildRouteEditor(routeColumn);
         routeList.SelectedIndexChanged+=(s,e)=>{UpdateRouteEditor();RefreshStatus();};
-        vehicleList.SelectionChanged+=(s,e)=>RefreshStatus();
+        vehicleList.SelectionChanged+=(s,e)=>{
+            if(vehicleList.SelectedItem!=null)externalVehiclePath=null;
+            RefreshStatus();
+        };
         details.Dock=DockStyle.Fill;details.ForeColor=Color.FromArgb(68,85,105);
         details.TextAlign=ContentAlignment.MiddleLeft;
         details.AutoEllipsis=true;main.Controls.Add(details,0,2);
@@ -137,11 +145,12 @@ internal sealed class ScenarioDetailDialog : Form {
     }
 
     private void BuildVehicleColumn(TableLayoutPanel parent,List<Item> available,string raw){
-        var panel=new TableLayoutPanel{Dock=DockStyle.Fill,RowCount=4,ColumnCount=1,Margin=new Padding(3)};
+        var panel=new TableLayoutPanel{Dock=DockStyle.Fill,RowCount=5,ColumnCount=1,Margin=new Padding(3)};
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute,38));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute,38));
         panel.RowStyles.Add(new RowStyle(SizeType.Percent,100));
         panel.RowStyles.Add(new RowStyle(SizeType.Absolute,32));
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute,42));
         parent.Controls.Add(panel,1,0);
         panel.Controls.Add(new Label{
             Text="車両の候補",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,
@@ -149,7 +158,7 @@ internal sealed class ScenarioDetailDialog : Form {
         },0,0);
         clearVehicle.Text=ScenarioChoices.IsRandom(raw)?"指定しない（ランダム）":"指定しない（シナリオの設定どおり）";
         clearVehicle.Dock=DockStyle.Fill;
-        clearVehicle.Click+=(s,e)=>vehicleList.ClearSelection();
+        clearVehicle.Click+=(s,e)=>{externalVehiclePath=null;vehicleList.ClearSelection();RefreshStatus();};
         panel.Controls.Add(clearVehicle,0,1);
 
         // Use the exact same CatalogView and metadata/thumbnail loader as the
@@ -168,6 +177,19 @@ internal sealed class ScenarioDetailDialog : Form {
             Text="候補 "+available.Count+"件",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,
             ForeColor=Color.FromArgb(105,117,132),Font=new Font("Yu Gothic UI",9)
         },0,3);
+        otherVehicle.Text="他の車両から選ぶ";
+        otherVehicle.Dock=DockStyle.Fill;
+        otherVehicle.AccessibleName="通常の車両一覧から他の車両を選ぶ";
+        otherVehicle.Click+=(s,e)=>ChooseExternalVehicle();
+        panel.Controls.Add(otherVehicle,0,4);
+    }
+    private void ChooseExternalVehicle(){
+        using(var dialog=new AdditionalVehicleDialog(allVehicles)){
+            if(dialog.ShowDialog(this)!=DialogResult.OK)return;
+            externalVehiclePath=dialog.VehiclePath;
+            vehicleList.ClearSelection();
+            RefreshStatus();
+        }
     }
 
     private void BuildRouteEditor(TableLayoutPanel parent){
@@ -216,13 +238,15 @@ internal sealed class ScenarioDetailDialog : Form {
         var r=routeList.SelectedItem as Item;
         var v=vehicleList.SelectedItem;
         string route=r==null?"シナリオ設定どおり":RouteDisplayNames.Display(r.Path);
-        string vehicle=v==null?"シナリオ設定どおり":Path.GetFileName(v.Entry.Path);
+        string vehicle=!String.IsNullOrWhiteSpace(externalVehiclePath)?
+            Path.GetFileName(externalVehiclePath)+"（他の車両）":
+            v==null?"シナリオ設定どおり":Path.GetFileName(v.Entry.Path);
         details.Text="起動時の選択: 路線 "+route+" ／ 車両 "+vehicle;
     }
 
     private void Accept(int mode){
         SelectedRoute=(routeList.SelectedItem as Item)==null?null:((Item)routeList.SelectedItem).Path;
-        SelectedVehicle=vehicleList.SelectedItem==null?null:vehicleList.SelectedItem.Entry.Path;
+        SelectedVehicle=externalVehiclePath??(vehicleList.SelectedItem==null?null:vehicleList.SelectedItem.Entry.Path);
         LaunchMode=mode;
         DialogResult=DialogResult.OK;
         Close();

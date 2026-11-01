@@ -5,6 +5,7 @@ using System.Windows.Forms;
 internal static class Starter {
     [STAThread] static void Main(){
         try{
+            TaskbarIdentity.IdentifyProcess();
             string root=AppDomain.CurrentDomain.BaseDirectory;
             string target=Path.GetFullPath(File.ReadAllText(Path.Combine(root,"現在.txt")).Trim());
             string versions=Path.GetFullPath(Path.Combine(root,"versions"))+Path.DirectorySeparatorChar;
