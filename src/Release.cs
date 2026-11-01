@@ -1,7 +1,7 @@
 internal static class Release {
-    public const bool IsDevelopmentPreview=true; // b6 feature trial; do not publish as b5
-    public const string Display="0.29b5";
-    public const string Number="0.2.9.16";
+    public const bool IsDevelopmentPreview=false;
+    public const string Display="0.29b6";
+    public const string Number="0.2.9.17";
     public const string Repository="nexorianexoria/bve6-compat-launcher";
     public const string DistributionUrl="https://github.com/"+Repository+"/releases/latest";
     public const string HistoryUrl="https://github.com/"+Repository+"/releases";

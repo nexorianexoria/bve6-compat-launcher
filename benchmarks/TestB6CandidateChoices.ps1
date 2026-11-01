@@ -100,6 +100,10 @@ try{
     $createMain=$launcher.GetConstructor([Reflection.BindingFlags]'Public,NonPublic,Instance',$null,[Type[]]@([bool]),$null)
     $main=$createMain.Invoke([object[]]@($false))
     try{
+        $selectionButton=$launcher.GetField('detailSelectionButton',$flags).GetValue($main)
+        if($selectionButton -eq $null -or $selectionButton.Enabled){
+            throw 'Detailed selection must be disabled until a scenario is selected'
+        }
         $createSettings=$launcher.GetMethod('CreateSettings',$flags)
         $settings=$createSettings.Invoke($main,[object[]]@())
         try{
