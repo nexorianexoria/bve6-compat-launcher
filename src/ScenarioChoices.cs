@@ -31,5 +31,17 @@ internal static class ScenarioChoices {
  public static string AbsoluteExpression(string directory,string value){
   return String.Join(" | ",Parse(directory,value).Select(x=>x.Path+" * "+x.Weight.ToString("R",CultureInfo.InvariantCulture)).ToArray());
  }
+ public static string Select(string directory,string value,string requested,bool vehicle){
+  if(String.IsNullOrWhiteSpace(requested))throw new InvalidDataException("候補を指定してください。");
+  string selected=Path.GetFullPath(requested);
+  if(!Parse(directory,value).Any(x=>String.Equals(x.Path,selected,StringComparison.OrdinalIgnoreCase)))
+   throw new InvalidDataException("選んだファイルは、このシナリオの候補に含まれていません。");
+  if(!File.Exists(selected))throw new FileNotFoundException("選んだ候補のファイルが見つかりません。",selected);
+  if(vehicle){
+   var lines=Program.Read(selected);
+   if(lines.Length==0||!Program.VehicleHeader(lines[0]))throw new InvalidDataException("選んだ車両は車両定義ファイルではありません。");
+  }
+  return selected;
+ }
  public static bool IsRandom(string value){return !String.IsNullOrWhiteSpace(value)&&value.Contains("|");}
 }
