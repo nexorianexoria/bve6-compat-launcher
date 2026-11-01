@@ -1,15 +1,19 @@
 using System;
 using System.Diagnostics;
+using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading.Tasks;
+using System.Windows.Forms;
 using System.Xml.Linq;
 
 // Read-only, one-shot diagnostics: never load the third-party plug-in or change its state.
 // In particular, do not attempt to 'resume' PanelViewEX by injecting code into BVE.
 internal static class PanelViewDiagnostics {
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WindowRectangle {public int Left,Top,Right,Bottom;}
     private delegate bool EnumWindowCallback(IntPtr hwnd, IntPtr lparam);
     [DllImport("user32.dll")] private static extern bool EnumWindows(EnumWindowCallback callback,IntPtr data);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hwnd,out uint pid);
@@ -19,6 +23,12 @@ internal static class PanelViewDiagnostics {
     private static extern int GetWindowText(IntPtr hwnd,StringBuilder buffer,int capacity);
     [DllImport("user32.dll",CharSet=CharSet.Unicode)]
     private static extern int GetClassName(IntPtr hwnd,StringBuilder buffer,int capacity);
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GetWindowRect(IntPtr hwnd,out WindowRectangle bounds);
+    [DllImport("user32.dll")] [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsIconic(IntPtr hwnd);
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetForegroundWindow();
 
     internal static bool TryParseLaunch(string message,out int pid,out string executable){
         pid=0;executable=null;
@@ -95,17 +105,27 @@ internal static class PanelViewDiagnostics {
                 sb.AppendLine("PanelView関連のネイティブDLL: "+(modules.Length==0?"検出なし":String.Join(", ",modules)));
             }catch(Exception ex){sb.AppendLine("モジュール照会: "+ex.Message);}
             var windows=new System.Collections.Generic.List<string>();
+            var monitors=Screen.AllScreens;
+            var foreground=GetForegroundWindow();
             var callback=new EnumWindowCallback((hwnd,context)=>{
                 uint owner;GetWindowThreadProcessId(hwnd,out owner);
                 if(owner!=(uint)pid || !IsWindowVisible(hwnd))return true;
                 var title=new StringBuilder(512);GetWindowText(hwnd,title,title.Capacity);
                 var cls=new StringBuilder(256);GetClassName(hwnd,cls,cls.Capacity);
-                windows.Add("クラス="+cls+" タイトル="+title);
+                WindowRectangle bounds;
+                string geometry="座標取得不可";
+                if(GetWindowRect(hwnd,out bounds)){
+                    var rectangle=Rectangle.FromLTRB(bounds.Left,bounds.Top,bounds.Right,bounds.Bottom);
+                    bool onscreen=rectangle.Width>0&&rectangle.Height>0&&monitors.Any(m=>m.Bounds.IntersectsWith(rectangle));
+                    geometry="座標=("+rectangle.Left+","+rectangle.Top+") 大きさ="+rectangle.Width+"x"+rectangle.Height+" 画面と重なる="+onscreen;
+                }
+                windows.Add("クラス="+cls+" タイトル="+title+" "+geometry+" 最小化="+IsIconic(hwnd)+" 最前面フォーカス="+(hwnd==foreground));
                 return true;
             });
             EnumWindows(callback,IntPtr.Zero);
             GC.KeepAlive(callback);
             sb.AppendLine("BVEプロセスの可視トップレベルウィンドウ数: "+windows.Count);
+            foreach(var monitor in monitors)sb.AppendLine("モニター領域: "+monitor.Bounds);
             foreach(string entry in windows)sb.AppendLine("  "+entry);
             sb.AppendLine("※ウィンドウ一覧だけでは表示成功・失敗を断定できません。");
         }finally {if(p!=null)p.Dispose();}
