@@ -1,0 +1,18 @@
+LIBRARY mockats
+EXPORTS
+  Load=_Load@0
+  Dispose=_Dispose@0
+  GetPluginVersion=_GetPluginVersion@0
+  SetVehicleSpec=_SetVehicleSpec@20
+  Initialize=_Initialize@4
+  Elapse=_Elapse@48
+  SetPower=_SetPower@4
+  SetBrake=_SetBrake@4
+  SetReverser=_SetReverser@4
+  KeyDown=_KeyDown@4
+  KeyUp=_KeyUp@4
+  HornBlow=_HornBlow@4
+  DoorOpen=_DoorOpen@0
+  DoorClose=_DoorClose@0
+  SetSignal=_SetSignal@4
+  SetBeaconData=_SetBeaconData@16

@@ -1,0 +1,17 @@
+obj/
+dist/
+benchmarks/results/
+*.tmp
+
+dist-fps/
+benchmarks/tools/
+dist-b5/
+benchmarks/__pycache__/
+*.pyc
+src/bridge/**/Release/
+src/bridge/**/Debug/
+src/bridge/**/x64/
+*.exp
+*.lib
+*.obj
+oneclick-scenario.local.txt

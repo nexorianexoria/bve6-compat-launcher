@@ -1,0 +1,47 @@
+name: Publish v0.29b5 latest
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/publish-b5-latest.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: github.repository == 'nexorianexoria/bve6-compat-launcher' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout approved release files
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify hashes and release version
+        run: |
+          set -euo pipefail
+          test -s downloads/0.29b5/BVE6Launcher-0.29b5-Portable.zip
+          test -s downloads/0.29b5/BVE6Launcher-0.29b5-Source.zip
+          test -s downloads/0.29b5/SHA256SUMS.txt
+          sha256sum -c downloads/0.29b5/SHA256SUMS.txt
+          grep -q 'Ver.0.29b5' RELEASE_NOTES_0.29b5_PUBLIC.md
+          grep -q 'Ver.0.29b5' README.md
+      - name: Create public latest release (keep older releases)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view v0.29b5 > /dev/null 2>&1; then
+            echo "Release v0.29b5 already exists; will not overwrite assets."
+            exit 0
+          fi
+          gh release create v0.29b5 \
+            downloads/0.29b5/BVE6Launcher-0.29b5-Portable.zip \
+            downloads/0.29b5/BVE6Launcher-0.29b5-Source.zip \
+            downloads/0.29b5/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" \
+            --title "Ver.0.29b5 — BVE6互換ランチャー（最新版）" \
+            --notes-file RELEASE_NOTES_0.29b5_PUBLIC.md \
+            --latest

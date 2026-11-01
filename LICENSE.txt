@@ -115,4 +115,3 @@ BVE Trainsim、BveEX、MotorMaster、bve-plugin-bridgeおよびその他の第�
 © 2026 @Aho11884845
 
 BVE Trainsim、BveEX、MotorMasterその他の第三者のソフトウェアに関する権利は、それぞれの権利者に帰属します。
-
