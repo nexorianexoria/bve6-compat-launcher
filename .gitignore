@@ -10,6 +10,7 @@ dist-panel-diagnostics/
 dist-b6-ui/
 dist-b7-ui/
 dist-b7-cards/
+dist-b7-release/
 benchmarks/__pycache__/
 *.pyc
 src/bridge/**/Release/
