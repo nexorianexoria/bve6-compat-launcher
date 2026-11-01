@@ -6,6 +6,7 @@ benchmarks/results/
 dist-fps/
 benchmarks/tools/
 dist-b5/
+dist-panel-diagnostics/
 benchmarks/__pycache__/
 *.pyc
 src/bridge/**/Release/
