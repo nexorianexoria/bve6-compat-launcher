@@ -1,5 +1,5 @@
 $ErrorActionPreference='Stop'
-$root=Split-Path -Parent $PSScriptRoot
+$root=if($PSScriptRoot){Split-Path -Parent $PSScriptRoot}else{(Get-Location).Path}
 Set-Location $root
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
