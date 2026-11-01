@@ -1,0 +1,59 @@
+name: Publish v0.29b8 latest
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/publish-b8-latest.yml"
+      - "downloads/0.29b8/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: github.repository == 'nexorianexoria/bve6-compat-launcher' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release files
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate package hashes and release files
+        run: |
+          set -euo pipefail
+          test -s downloads/0.29b8/BVE6Launcher-0.29b8-Portable.zip
+          test -s downloads/0.29b8/BVE6Launcher-0.29b8-Source.zip
+          test -s downloads/0.29b8/BVE6Launcher-Setup.exe
+          test -s downloads/0.29b8/BVE6Launcher-package.zip
+          test -s downloads/0.29b8/SHA256SUMS.txt
+          sha256sum -c downloads/0.29b8/SHA256SUMS.txt
+          grep -q 'Ver.0.29b8' RELEASE_NOTES_0.29b8_PUBLIC.md
+          grep -q 'Ver.0.29b8' README.md
+          grep -q '0.2.9.19' update.json
+      - name: Publish b8 release and keep earlier versions
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh release view v0.29b8 >/dev/null 2>&1; then
+            gh release upload v0.29b8 \
+              downloads/0.29b8/BVE6Launcher-0.29b8-Portable.zip \
+              downloads/0.29b8/BVE6Launcher-0.29b8-Source.zip \
+              downloads/0.29b8/BVE6Launcher-Setup.exe \
+              downloads/0.29b8/BVE6Launcher-package.zip \
+              downloads/0.29b8/SHA256SUMS.txt --clobber
+            gh release edit v0.29b8 --notes-file RELEASE_NOTES_0.29b8_PUBLIC.md --latest
+          else
+            gh release create v0.29b8 \
+              downloads/0.29b8/BVE6Launcher-0.29b8-Portable.zip \
+              downloads/0.29b8/BVE6Launcher-0.29b8-Source.zip \
+              downloads/0.29b8/BVE6Launcher-Setup.exe \
+              downloads/0.29b8/BVE6Launcher-package.zip \
+              downloads/0.29b8/SHA256SUMS.txt \
+              --target "$GITHUB_SHA" \
+              --title "Ver.0.29b8 — BVE6互換ランチャー" \
+              --notes-file RELEASE_NOTES_0.29b8_PUBLIC.md \
+              --latest
+          fi

@@ -15,6 +15,9 @@ internal static class UpdateHistory {
     }
 
     internal static readonly Entry[] Published={
+        new Entry("0.29b8","2026/11/01",
+            "b7の配布パッケージに古い実行ファイルが含まれていた問題を修正。\r\n"+
+            "「ルート設定」、画像付き車両候補、ルート名保存などの修正を正しく反映。"),
         new Entry("0.29b7","2026/11/01",
             "詳細選択のボタンを「ルート設定」に変更。\r\n"+
             "車両候補を通常の車両選択画面と同じ画像付きカード一覧で表示。\r\n"+
