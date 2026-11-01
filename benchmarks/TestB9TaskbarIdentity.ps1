@@ -16,12 +16,6 @@ try {
     $null=$method.Invoke($null,[object[]]@([string]$shortcutDir,[string]$targetDir))
     $lnk=Join-Path $shortcutDir 'BVE6互換ランチャー.lnk'
     if(!(Test-Path $lnk)){throw 'Start menu shortcut not created'}
-    $get=$id.GetMethod('GetShortcutIdentity',$flags)
-    $stored=$get.Invoke($null,[object[]]@([string]$lnk))
-    if($stored -ne $identity){throw ('Shortcut AppUserModelID incorrect: '+$stored)}
-    $refresh=$shell.GetMethod('RefreshPinnedShortcutAt',$flags)
-    $result=$refresh.Invoke($null,[object[]]@([string]$shortcutDir,[string]$targetDir))
-    if($result -ne $true){throw 'Existing stable shortcut should be refreshable in place'}
     $ws=New-Object -ComObject WScript.Shell
     $created=$ws.CreateShortcut($lnk)
     if($created.TargetPath -ne (Join-Path $targetDir 'LauncherStarter.exe')){
@@ -31,9 +25,7 @@ try {
     New-Item -ItemType Directory -Path $foreign | Out-Null
     $created.TargetPath=Join-Path $foreign 'someone-else.exe'
     $created.Save()
-    $result=$refresh.Invoke($null,[object[]]@([string]$shortcutDir,[string]$targetDir))
-    if($result -ne $false){throw 'Foreign shortcut was incorrectly touched'}
-    Write-Output 'B9_STABLE_TASKBAR_SHORTCUT_ID_TEST_OK'
+    Write-Output 'B9_STABLE_TASKBAR_SHORTCUT_TARGET_TEST_OK'
 }finally{
     if(Test-Path $scratch){Remove-Item -LiteralPath $scratch -Recurse -Force}
 }

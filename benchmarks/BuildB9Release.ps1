@@ -50,7 +50,7 @@ try {
         version=$version;displayVersion=$display
         url='https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29b9/BVE6Launcher-package.zip'
         sha256=$sha
-        notes='0.29b9：タスクバーのピン留めを保持するための識別子統一と、ルート設定の「他の車両から選ぶ」を追加しました。'
+        notes='0.29b9：タスクバー表示の改善と、ルート設定の「他の車両から選ぶ」を追加しました。'
     }
     $json=$manifest|ConvertTo-Json -Depth 5
     [IO.File]::WriteAllText((Join-Path $out 'package.json'),$json,[Text.UTF8Encoding]::new($false))

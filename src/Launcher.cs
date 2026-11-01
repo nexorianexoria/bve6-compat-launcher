@@ -18,12 +18,6 @@ internal static class Program {
             try{TaskbarIdentity.IdentifyProcess();}
             catch(Exception ex){System.Diagnostics.Debug.WriteLine("Taskbar identity: "+ex.Message);}
             Directory.CreateDirectory(Data); Diagnostics.Initialize();
-            // Upgrade an existing user pin without deleting, recreating, or
-            // changing a shortcut that belongs to another application.
-            try {
-                string installedRoot=InstallEngine.DetectRoot(Home);
-                if(installedRoot!=null)InstallShell.RefreshExistingTaskbarPin(installedRoot);
-            }catch(Exception ex){Diagnostics.Write("TASKBAR_PIN_IDENTITY",ex.Message);}
             Application.ThreadException+=(sender,eventArgs)=>{Diagnostics.Error("UI_ERROR",eventArgs.Exception);MessageBox.Show(eventArgs.Exception.Message,"エラーが発生しました。ログ・バグ報告から記録を確認できます。");}; AppDomain.CurrentDomain.UnhandledException+=(sender,eventArgs)=>Diagnostics.Write("UNHANDLED",eventArgs.ExceptionObject.ToString());
             if(args.Length == 3 && args[0] == "--prepare") { Console.WriteLine(Prepare(args[1], args[2]).Scenario); return 0; }
             // Headless b5 test launch: the parent is not elevated and records the exact BVE PID.
