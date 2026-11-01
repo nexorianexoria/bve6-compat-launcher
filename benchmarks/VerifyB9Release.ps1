@@ -46,7 +46,7 @@ try {
 }finally{$portable.Dispose()}
 $indexFile=Join-Path $asset 'SHA256SUMS.txt'
 foreach($line in [IO.File]::ReadAllLines($indexFile)){
-    if($line -notmatch '^([a-f0-9]{64})  (downloads/0\.29b8/.+)$'){throw 'Checksum record malformed'}
+    if($line -notmatch '^([a-f0-9]{64})  (downloads/0\.29b9/.+)$'){throw 'Checksum record malformed'}
     $path=Join-Path $root $Matches[2]
     if(!(Test-Path -LiteralPath $path)){throw ('Missing asset: '+$Matches[2])}
     if((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant() -ne $Matches[1]){throw ('Asset hash differs: '+$Matches[2])}
@@ -57,7 +57,7 @@ $flags=[Reflection.BindingFlags]'NonPublic,Public,Static'
 $parse=$type.GetMethod('ParseManifest',$flags)
 $install=$type.GetMethod('Install',$flags)
 $parsed=$parse.Invoke($null,[object[]]@([string]$manifestJson,[Version]'0.2.9.20',[string]'0.2.9.20'))
-$scratch=Join-Path $root ('benchmarks\b8-install-check-'+[guid]::NewGuid().ToString('N'))
+$scratch=Join-Path $root ('benchmarks\b9-install-check-'+[guid]::NewGuid().ToString('N'))
 $destination=Join-Path $scratch 'BVE6互換ランチャー'
 try {
     $arguments=New-Object 'object[]' 4
