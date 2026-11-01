@@ -1,6 +1,6 @@
 $ErrorActionPreference='Stop'
 $root=if($PSScriptRoot){Split-Path -Parent $PSScriptRoot}else{(Get-Location).Path}
-$exe=Join-Path $root 'dist-b7-ui\BVE6互換ランチャー.exe'
+$exe=Join-Path $root 'dist-b7-cards\BVE6互換ランチャー.exe'
 if(!(Test-Path $exe)){throw 'Build b7 launcher first'}
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -62,9 +62,14 @@ try {
     $form=$ctor.Invoke([object[]]@([string]$scenario))
     try{
         $lists=@(Controls-OfType $form ([Windows.Forms.ListBox]))
-        if($lists.Count -ne 2){throw 'Expected two selection lists'}
-        $routes=$lists[0];$vehicles=$lists[1]
-        if($routes.Items.Count -ne 3 -or $vehicles.Items.Count -ne 3){throw 'Candidate rows missing'}
+        $cards=@(Controls-OfType $form ($assembly.GetType('CatalogView',$true)))
+        if($lists.Count -ne 1 -or $cards.Count -ne 1){throw 'Expected route list and regular vehicle card gallery'}
+        $routes=$lists[0];$vehicles=$cards[0]
+        if($routes.Items.Count -ne 3 -or $vehicles.ItemCount -ne 2){throw 'Candidate rows missing'}
+        if($vehicles.SelectedItem -ne $null){throw 'Vehicle should start as random / unselected'}
+        if($routes.Items[1].ToString().Contains('重み')){throw 'Unnecessary candidate weight label still appears'}
+        $vehicleDefaults=@(Controls-OfType $form ([Windows.Forms.Button]) | Where-Object { $_.Text -match '指定しない' })
+        if($vehicleDefaults.Count -ne 1 -or $vehicleDefaults[0].Text -ne '指定しない（ランダム）'){throw 'Random selection reset button missing'}
         if($routes.Items[1].ToString() -notmatch 'テスト1'){throw 'Saved route name missing from selection screen'}
         $editor=$detail.GetField('routeEditorPanel',$flags).GetValue($form)
         $routeColumn=$detail.GetField('routeColumn',$flags).GetValue($form)
@@ -80,20 +85,17 @@ try {
         $input.Text=''
         $null=$detail.GetMethod('SaveRouteName',$flags).Invoke($form,[object[]]@())
         if(Invoke-Method $alias 'GetName' @([string]$routeA)){throw 'Clearing name did not restore default'}
-        $vehicles.SelectedIndex=1
-        $picture=$detail.GetField('panelPicture',$flags).GetValue($form)
-        for($i=0;$i -lt 60 -and $null -eq $picture.Image;$i++){
-            [Windows.Forms.Application]::DoEvents()
-            Start-Sleep -Milliseconds 50
-        }
-        if($null -eq $picture.Image){throw 'Selected vehicle panel preview did not load'}
-        if($picture.Image.Width -ne 300 -or $picture.Image.Height -ne 120){throw 'Unexpected selected panel dimensions'}
-        $vehicles.SelectedIndex=2
-        for($i=0;$i -lt 60;$i++){
-            [Windows.Forms.Application]::DoEvents()
-            Start-Sleep -Milliseconds 20
-        }
-        if($picture.Image -ne $null){throw 'Vehicle without panel image retained the previous image'}
+        $items=@($assembly.GetType('CatalogView',$true).GetField('items',$flags).GetValue($vehicles))
+        $vehicleWithPanel=$items|Where-Object { $_.Entry.Path -eq $vehicleA }|Select-Object -First 1
+        $vehicleWithoutPanel=$items|Where-Object { $_.Entry.Path -eq $vehicleB }|Select-Object -First 1
+        if($null -eq $vehicleWithPanel -or $null -eq $vehicleWithoutPanel){throw 'Vehicle gallery candidates missing'}
+        if($vehicleWithPanel.ImagePath -ne $image){throw 'Normal vehicle gallery did not resolve the selected panel image'}
+        if($vehicleWithoutPanel.ImagePath){throw 'Vehicle without panel falsely reused an unrelated panel image'}
+        if(!$vehicles.SelectPath($vehicleA)){throw 'Selecting an image-backed vehicle failed'}
+        if($vehicles.SelectedItem.Entry.Path -ne $vehicleA){throw 'Card selection did not select desired vehicle'}
+        # Invoke the wired button click even though the test dialog stays hidden.
+        [Windows.Forms.Control].GetMethod('OnClick',[Reflection.BindingFlags]'Instance,NonPublic').Invoke($vehicleDefaults[0],[object[]]@([EventArgs]::Empty)) | Out-Null
+        if($null -ne $vehicles.SelectedItem){throw 'Reset did not restore random vehicle choice'}
     }finally{$form.Dispose()}
     $null=Invoke-Method $alias 'SetName' @([string]$routeA,[string]'テスト1')
     $null=Invoke-Method $alias 'SetEnabled' @($false)
@@ -102,12 +104,12 @@ try {
     if((Invoke-Method $alias 'Display' @([string]$routeA)) -match 'テスト1'){throw 'Names still displayed when setting is off'}
     if((Invoke-Method $alias 'GetName' @([string]$routeA)) -ne 'テスト1'){throw 'Turning off deleted saved name'}
     if((Get-FileHash -LiteralPath $routeA -Algorithm SHA256).Hash -ne $before){throw 'Original route file changed'}
-    $program.GetField('Home',$flags).SetValue($null,(Join-Path $root 'dist-b7-ui'))
+    $program.GetField('Home',$flags).SetValue($null,(Join-Path $root 'dist-b7-cards'))
     $program.GetField('Data',$flags).SetValue($null,(Join-Path $scratch 'work'))
     $main=$launcherType.GetConstructor([Reflection.BindingFlags]'Public,NonPublic,Instance',$null,[Type[]]@([bool]),$null).Invoke([object[]]@($false))
     try{
         $detailButton=$launcherType.GetField('detailSelectionButton',$flags).GetValue($main)
-        if($detailButton.Text -ne '路線・車両を選ぶ' -or $detailButton.Enabled){throw 'Main detail button label or default state wrong'}
+        if($detailButton.Text -ne 'ルート設定' -or $detailButton.Enabled){throw 'Main detail button label or default state wrong'}
         if($main.Text -ne 'BVE 起動ランチャー Ver.0.29b7'){throw 'Window title contains an unrequested version label'}
         $headerLabels=@(Controls-OfType $main ([Windows.Forms.Label]) | Where-Object { $_.Text -like 'Ver.*' })
         if($headerLabels.Count -ne 1 -or $headerLabels[0].Text -ne 'Ver.0.29b7'){throw 'Header must show only the version number'}

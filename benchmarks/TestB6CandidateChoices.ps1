@@ -90,12 +90,29 @@ try{
             }
         }
         Collect-Lists $dialog $listBoxes
-        if($listBoxes.Count -ne 2 -or $listBoxes[0].Items.Count -ne 3 -or $listBoxes[1].Items.Count -ne 3){
-            throw 'Independent route / vehicle candidate controls missing'
-        }
-        if($listBoxes[0].SelectedIndex -ne 0 -or $listBoxes[1].SelectedIndex -ne 0){
-            throw 'Random/default selections are not the initial choices'
-        }
+        if($listBoxes.Count -eq 2){
+            if($listBoxes[0].Items.Count -ne 3 -or $listBoxes[1].Items.Count -ne 3){
+                throw 'B6 route / vehicle candidates missing'
+            }
+            if($listBoxes[0].SelectedIndex -ne 0 -or $listBoxes[1].SelectedIndex -ne 0){
+                throw 'B6 default selections changed'
+            }
+        }elseif($listBoxes.Count -eq 1){
+            $catalogType=$assembly.GetType('CatalogView',$true)
+            function Find-Cards($control){
+                foreach($child in $control.Controls){
+                    if($child -is $catalogType){$child}
+                    Find-Cards $child
+                }
+            }
+            $cards=@(Find-Cards $dialog)
+            if($listBoxes[0].Items.Count -ne 3 -or $cards.Count -ne 1 -or $cards[0].ItemCount -ne 2){
+                throw 'B7 route list or image-backed vehicle gallery missing'
+            }
+            if($listBoxes[0].SelectedIndex -ne 0 -or $null -ne $cards[0].SelectedItem){
+                throw 'B7 must preserve random/default selection initially'
+            }
+        }else{throw 'Independent route and vehicle selection not found'}
     }finally{$dialog.Dispose()}
     $createMain=$launcher.GetConstructor([Reflection.BindingFlags]'Public,NonPublic,Instance',$null,[Type[]]@([bool]),$null)
     $main=$createMain.Invoke([object[]]@($false))

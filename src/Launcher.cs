@@ -273,7 +273,7 @@ internal sealed class Launcher:ModernWindow {
   actions.ColumnStyles[4].SizeType=SizeType.Absolute;
   actions.ColumnStyles[4].Width=160;
   actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-  var detail=new ModernButton{Text="路線・車両を選ぶ",Symbol="list",Dock=DockStyle.Fill,Enabled=scenarios.SelectedItem!=null};
+  var detail=new ModernButton{Text="ルート設定",Symbol="list",Dock=DockStyle.Fill,Enabled=scenarios.SelectedItem!=null};
   detailSelectionButton=detail;
   new ToolTip().SetToolTip(detail,"選択したシナリオの路線（マップ）と車両の候補を一覧で確認し、別々に選んで起動できます。");
   detail.Click+=(s,e)=>ShowDetailChooser();

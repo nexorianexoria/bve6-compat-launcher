@@ -10,7 +10,11 @@ internal static class Previews {
   if(String.IsNullOrEmpty(definition))return null;
   string dir=Path.GetDirectoryName(definition);
   if(!vehicle){string scenarioImage=Program.Value(lines,"Image");return Existing(dir,scenarioImage);}
-  string panel=Existing(dir,Program.Value(lines,"Panel"));
+  // Without a Panel entry there is no vehicle-specific panel to preview.
+  // Do not borrow a different vehicle's panel*.txt from the same folder.
+  string panelSpec=Program.Value(lines,"Panel");
+  if(String.IsNullOrWhiteSpace(panelSpec))return null;
+  string panel=Existing(dir,panelSpec);
   string image=PanelImage(panel);if(image!=null)return image;
   // Search only sibling panel definitions, never another vehicle's directory.
   foreach(string candidate in Directory.GetFiles(panel==null?dir:Path.GetDirectoryName(panel),"panel*.txt")){

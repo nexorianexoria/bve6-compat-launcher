@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 // An opt-in preview of the candidates actually listed in the scenario.
@@ -26,16 +25,17 @@ internal sealed class ScenarioDetailDialog : Form {
     internal string SelectedRoute {get;private set;}
     internal string SelectedVehicle {get;private set;}
     internal int LaunchMode {get;private set;}
-    private readonly ListBox routeList=new ListBox(),vehicleList=new ListBox();
+    private readonly ListBox routeList=new ListBox();
+    // Same image-backed, selectable card view as the main vehicle selection.
+    private readonly CatalogView vehicleList=new CatalogView{ShowVehicleLocation=true};
     private readonly Label details=new Label();
     private readonly TextBox routeName=new TextBox();
     private readonly Button saveRouteName=new Button();
-    private readonly Label routeEditorInfo=new Label(),panelPreviewInfo=new Label();
-    private readonly PictureBox panelPicture=new PictureBox();
+    private readonly Label routeEditorInfo=new Label();
+    private readonly Button clearVehicle=new Button();
     private TableLayoutPanel routeColumn,routeEditorPanel;
     private readonly Button[] startButtons=new Button[3];
     private readonly string scenario;
-    private int previewRequest;
 
     internal static List<Item> Available(string scenario,string value,bool vehicle){
         string directory=Path.GetDirectoryName(Path.GetFullPath(scenario));
@@ -53,8 +53,6 @@ internal sealed class ScenarioDetailDialog : Form {
             string name=Path.GetFileNameWithoutExtension(choice.Path);
             string parent=Path.GetFileName(Path.GetDirectoryName(choice.Path));
             string label=name+"  ("+parent+")";
-            if(ScenarioChoices.IsRandom(value))
-                label+="  [重み "+choice.Weight.ToString("G",System.Globalization.CultureInfo.InvariantCulture)+"]";
             items.Add(new Item(choice.Path,choice.Weight,label,!vehicle));
         }
         return items;
@@ -90,11 +88,10 @@ internal sealed class ScenarioDetailDialog : Form {
         columns.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));
         main.Controls.Add(columns,0,1);
         routeColumn=BuildColumn(columns,routeList,0,"路線・マップの候補",routeSpec,routes,String.IsNullOrWhiteSpace(routeSpec)?0:ScenarioChoices.Parse(Path.GetDirectoryName(scenario),routeSpec).Count);
-        var vehicleColumn=BuildColumn(columns,vehicleList,1,"車両の候補",vehicleSpec,vehicles,String.IsNullOrWhiteSpace(vehicleSpec)?0:ScenarioChoices.Parse(Path.GetDirectoryName(scenario),vehicleSpec).Count);
+        BuildVehicleColumn(columns,vehicles,vehicleSpec);
         BuildRouteEditor(routeColumn);
-        BuildPanelPreview(vehicleColumn);
         routeList.SelectedIndexChanged+=(s,e)=>{UpdateRouteEditor();RefreshStatus();};
-        vehicleList.SelectedIndexChanged+=(s,e)=>{RefreshStatus();ShowVehiclePreview();};
+        vehicleList.SelectionChanged+=(s,e)=>RefreshStatus();
         details.Dock=DockStyle.Fill;details.ForeColor=Color.FromArgb(68,85,105);
         details.TextAlign=ContentAlignment.MiddleLeft;
         details.AutoEllipsis=true;main.Controls.Add(details,0,2);
@@ -115,8 +112,6 @@ internal sealed class ScenarioDetailDialog : Form {
         CancelButton=cancel;
         UpdateRouteEditor();
         RefreshStatus();
-        ShowVehiclePreview();
-        FormClosed+=(s,e)=>{previewRequest++;var old=panelPicture.Image;panelPicture.Image=null;if(old!=null)old.Dispose();};
     }
 
     private static TableLayoutPanel BuildColumn(TableLayoutPanel parent,ListBox list,int column,string title,string raw,List<Item> available,int total){
@@ -135,10 +130,44 @@ internal sealed class ScenarioDetailDialog : Form {
         // Show missing candidates without offering a broken launch choice.
         panel.Controls.Add(new Label{
             Text="候補 "+available.Count+"件"+(total>available.Count?" ／利用不可 "+(total-available.Count)+"件":"")+
-                 "\n候補名の右はフォルダー名・設定上の重み",
+                 "\n候補名の右は保存先フォルダー名",
             Dock=DockStyle.Fill,ForeColor=Color.FromArgb(105,117,132),Font=new Font("Yu Gothic UI",9)
         },0,2);
         return panel;
+    }
+
+    private void BuildVehicleColumn(TableLayoutPanel parent,List<Item> available,string raw){
+        var panel=new TableLayoutPanel{Dock=DockStyle.Fill,RowCount=4,ColumnCount=1,Margin=new Padding(3)};
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute,38));
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute,38));
+        panel.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+        panel.RowStyles.Add(new RowStyle(SizeType.Absolute,32));
+        parent.Controls.Add(panel,1,0);
+        panel.Controls.Add(new Label{
+            Text="車両の候補",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,
+            ForeColor=Color.FromArgb(27,48,77),Font=new Font("Yu Gothic UI",11,FontStyle.Bold)
+        },0,0);
+        clearVehicle.Text=ScenarioChoices.IsRandom(raw)?"指定しない（ランダム）":"指定しない（シナリオの設定どおり）";
+        clearVehicle.Dock=DockStyle.Fill;
+        clearVehicle.Click+=(s,e)=>vehicleList.ClearSelection();
+        panel.Controls.Add(clearVehicle,0,1);
+
+        // Use the exact same CatalogView and metadata/thumbnail loader as the
+        // regular vehicle list. Only scenario-listed, existing candidates
+        // are supplied; the user's vehicle files are never changed.
+        var entries=available.Select(v=>new Program.Entry{
+            Path=v.Path,Title=Path.GetFileNameWithoutExtension(v.Path)
+        }).ToArray();
+        var cards=CatalogData.Build(entries,Path.GetDirectoryName(scenario),true);
+        vehicleList.Dock=DockStyle.Fill;
+        vehicleList.AccessibleName="車両のランダム候補（画像付き）";
+        vehicleList.EmptyText="選択できる車両がありません";
+        vehicleList.SetItems(cards);
+        panel.Controls.Add(vehicleList,0,2);
+        panel.Controls.Add(new Label{
+            Text="候補 "+available.Count+"件",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,
+            ForeColor=Color.FromArgb(105,117,132),Font=new Font("Yu Gothic UI",9)
+        },0,3);
     }
 
     private void BuildRouteEditor(TableLayoutPanel parent){
@@ -183,51 +212,17 @@ internal sealed class ScenarioDetailDialog : Form {
             MessageBox.Show(this,"ルート名を保存できませんでした。\n"+ex.Message,"ルート名の保存",MessageBoxButtons.OK,MessageBoxIcon.Warning);
         }
     }
-    private void BuildPanelPreview(TableLayoutPanel parent){
-        var panel=new TableLayoutPanel{Dock=DockStyle.Fill,RowCount=2,ColumnCount=1,Padding=new Padding(8,2,8,4),BackColor=Color.FromArgb(237,242,247)};
-        panel.RowStyles.Add(new RowStyle(SizeType.Absolute,28));
-        panel.RowStyles.Add(new RowStyle(SizeType.Percent,100));
-        parent.Controls.Add(panel,0,3);
-        panelPreviewInfo.Dock=DockStyle.Fill;panelPreviewInfo.TextAlign=ContentAlignment.MiddleLeft;
-        panelPreviewInfo.ForeColor=Color.FromArgb(65,84,109);panelPreviewInfo.Text="運転台パネル画像";
-        panel.Controls.Add(panelPreviewInfo,0,0);
-        panelPicture.Dock=DockStyle.Fill;panelPicture.BackColor=Color.FromArgb(224,231,238);
-        panelPicture.SizeMode=PictureBoxSizeMode.Zoom;panelPicture.AccessibleName="選択した車両の運転台パネル画像";
-        panel.Controls.Add(panelPicture,0,1);
-    }
-    private async void ShowVehiclePreview(){
-        int request=++previewRequest;
-        var item=vehicleList.SelectedItem as Item;
-        var previous=panelPicture.Image;panelPicture.Image=null;if(previous!=null)previous.Dispose();
-        if(item==null){panelPreviewInfo.Text="車両を選ぶと運転台パネル画像を表示します。";return;}
-        panelPreviewInfo.Text="運転台パネル画像を読み込み中…";
-        Image loaded=null;
-        try{
-            loaded=await Task.Run(()=>{
-                // Do not borrow an unrelated sibling's panel when the selected
-                // vehicle has no panel definition of its own.
-                string[] vehicleLines=Program.Read(item.Path);
-                if(String.IsNullOrWhiteSpace(Program.Value(vehicleLines,"Panel")))return null;
-                string image=Previews.Resolve(item.Path,true);
-                return image==null?null:Previews.Load(image);
-            });
-        }catch(Exception ex){Diagnostics.Write("DETAIL_PANEL_PREVIEW",item.Path+" : "+ex.Message);}
-        if(IsDisposed||request!=previewRequest){if(loaded!=null)loaded.Dispose();return;}
-        panelPicture.Image=loaded;
-        panelPreviewInfo.Text=loaded==null?"この車両のパネル画像は見つかりませんでした。":"運転台パネル画像（選択中の車両）";
-    }
-
     private void RefreshStatus(){
         var r=routeList.SelectedItem as Item;
-        var v=vehicleList.SelectedItem as Item;
+        var v=vehicleList.SelectedItem;
         string route=r==null?"シナリオ設定どおり":RouteDisplayNames.Display(r.Path);
-        string vehicle=v==null?"シナリオ設定どおり":Path.GetFileName(v.Path);
+        string vehicle=v==null?"シナリオ設定どおり":Path.GetFileName(v.Entry.Path);
         details.Text="起動時の選択: 路線 "+route+" ／ 車両 "+vehicle;
     }
 
     private void Accept(int mode){
         SelectedRoute=(routeList.SelectedItem as Item)==null?null:((Item)routeList.SelectedItem).Path;
-        SelectedVehicle=(vehicleList.SelectedItem as Item)==null?null:((Item)vehicleList.SelectedItem).Path;
+        SelectedVehicle=vehicleList.SelectedItem==null?null:vehicleList.SelectedItem.Entry.Path;
         LaunchMode=mode;
         DialogResult=DialogResult.OK;
         Close();
