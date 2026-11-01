@@ -251,9 +251,9 @@ internal static class Program {
 
 internal sealed class Launcher:ModernWindow {
  TextBox root=new TextBox(),search=new TextBox(),vehicleSearch=new TextBox(),exe=new TextBox(),exe5=new TextBox();CatalogView scenarios=new CatalogView(),vehicles=new CatalogView();DetailTextView scenarioInfo=new DetailTextView(),vehicleInfo=new DetailTextView();PictureBox scenarioPicture=new PictureBox(),vehiclePicture=new PictureBox();Label status=new Label(),scenarioCount=new Label(),vehicleCount=new Label();ProgressBar loadingBar=new ProgressBar();TableLayoutPanel launchLayout;ModernButton detailSelectionButton;Button[] launchButtons=new Button[3];List<CatalogItem> sc=new List<CatalogItem>(),vc=new List<CatalogItem>();int scanGeneration;CancellationTokenSource scanCancellation;bool filtering;int activeBveProcesses;bool gameQuietMode,pendingScanAfterGame;readonly BveGameplayActivity bveActivity=new BveGameplayActivity();
- public Launcher(bool startServices=true){Icon=new Icon(Path.Combine(Program.Home,"launcher.ico"));Text="BVE 起動ランチャー Ver."+Release.Display+(Release.IsDevelopmentPreview?"（次期b6機能試験版）":"");Size=new Size(1600,990);MinimumSize=new Size(960,680);Font=new Font("Yu Gothic UI",10);StartPosition=FormStartPosition.CenterScreen;
+ public Launcher(bool startServices=true){Icon=new Icon(Path.Combine(Program.Home,"launcher.ico"));Text="BVE 起動ランチャー Ver."+Release.Display;Size=new Size(1600,990);MinimumSize=new Size(960,680);Font=new Font("Yu Gothic UI",10);StartPosition=FormStartPosition.CenterScreen;
   BackColor=Color.FromArgb(245,248,252);var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=6,Padding=new Padding(17,10,17,12),BackColor=Color.FromArgb(245,248,252)};Controls.Add(layout);foreach(int h in new[]{56,55,52})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,h));layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));foreach(int h in new[]{140,132})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,h));
-  var header=new Panel{Dock=DockStyle.Fill,BackColor=Color.White,Margin=new Padding(0,0,0,7)};var appIcon=new PictureBox{Image=LoadHeaderLogo(),SizeMode=PictureBoxSizeMode.Zoom,Location=new Point(12,4),Size=new Size(34,34)};header.Controls.Add(appIcon);header.Controls.Add(new Label{Text="BVE 起動ランチャー",Font=new Font(Font.FontFamily,15,FontStyle.Bold),ForeColor=Color.FromArgb(27,48,77),Location=new Point(56,5),AutoSize=true});header.Controls.Add(new Label{Text="Ver."+Release.Display+(Release.IsDevelopmentPreview?" b6機能試験版":" 正式版"),ForeColor=Color.FromArgb(105,120,139),Location=new Point(265,10),AutoSize=true});Caption(header);layout.Controls.Add(header);
+  var header=new Panel{Dock=DockStyle.Fill,BackColor=Color.White,Margin=new Padding(0,0,0,7)};var appIcon=new PictureBox{Image=LoadHeaderLogo(),SizeMode=PictureBoxSizeMode.Zoom,Location=new Point(12,4),Size=new Size(34,34)};header.Controls.Add(appIcon);header.Controls.Add(new Label{Text="BVE 起動ランチャー",Font=new Font(Font.FontFamily,15,FontStyle.Bold),ForeColor=Color.FromArgb(27,48,77),Location=new Point(56,5),AutoSize=true});header.Controls.Add(new Label{Text="Ver."+Release.Display,ForeColor=Color.FromArgb(105,120,139),Location=new Point(265,10),AutoSize=true});Caption(header);layout.Controls.Add(header);
   var folder=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=4};folder.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,130));folder.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));folder.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,150));folder.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,90));folder.Controls.Add(new Label{Text="シナリオフォルダ",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft},0,0);root.Text=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),"BveTs","Scenarios");root.Dock=DockStyle.Fill;folder.Controls.Add(root,1,0);var browse=new ModernButton{Text="フォルダを選ぶ",Symbol="folder",Dock=DockStyle.Fill};folder.Controls.Add(browse,2,0);var reload=new ModernButton{Text="更新",Symbol="refresh",Dock=DockStyle.Fill};folder.Controls.Add(reload,3,0);reload.Click+=(s,e)=>LoadData();layout.Controls.Add(folder);browse.Click+=(s,e)=>{using(var d=new FolderBrowserDialog()){d.SelectedPath=root.Text;if(d.ShowDialog()==DialogResult.OK){root.Text=d.SelectedPath;LoadData();}}};
   var searches=Columns();searches.Controls.Add(SearchBox("路線を検索",search));searches.Controls.Add(SearchBox("車両を検索",vehicleSearch));layout.Controls.Add(searches);search.TextChanged+=(s,e)=>Filter();vehicleSearch.TextChanged+=(s,e)=>Filter();
   var lists=Columns();scenarios.Dock=vehicles.Dock=DockStyle.Fill;vehicles.ShowVehicleLocation=true;scenarios.AccessibleName="路線・シナリオ一覧";vehicles.AccessibleName="車両・編成一覧";lists.Controls.Add(Group("路線・シナリオ一覧",scenarios));lists.Controls.Add(Group("車両・編成一覧（パネル画像）",vehicles));layout.Controls.Add(lists);
@@ -273,8 +273,9 @@ internal sealed class Launcher:ModernWindow {
   actions.ColumnStyles[4].SizeType=SizeType.Absolute;
   actions.ColumnStyles[4].Width=160;
   actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));
-  var detail=new ModernButton{Text="候補を詳しく選ぶ",Symbol="list",Dock=DockStyle.Fill,Enabled=scenarios.SelectedItem!=null};
+  var detail=new ModernButton{Text="路線・車両を選ぶ",Symbol="list",Dock=DockStyle.Fill,Enabled=scenarios.SelectedItem!=null};
   detailSelectionButton=detail;
+  new ToolTip().SetToolTip(detail,"選択したシナリオの路線（マップ）と車両の候補を一覧で確認し、別々に選んで起動できます。");
   detail.Click+=(s,e)=>ShowDetailChooser();
   actions.Controls.Add(detail,4,0);
   actions.Controls.Add(statusContainer,5,0);
@@ -306,20 +307,33 @@ internal sealed class Launcher:ModernWindow {
  }
  void ShowSettings(){using(var dialog=CreateSettings()){dialog.ShowDialog(this);}}
  internal Form CreateSettings(){
-  var dialog=new Form{Text="設定 | BVE 起動ランチャー",Size=new Size(850,615),MinimumSize=new Size(640,550),StartPosition=FormStartPosition.CenterParent,Font=new Font("Yu Gothic UI",10),BackColor=Color.FromArgb(245,248,252)};
-  var table=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=8,Padding=new Padding(22,18,22,16)};dialog.Controls.Add(table);
-  table.RowStyles.Add(new RowStyle(SizeType.Absolute,45));for(int i=0;i<4;i++)table.RowStyles.Add(new RowStyle(SizeType.Absolute,59));table.RowStyles.Add(new RowStyle(SizeType.Percent,100));table.RowStyles.Add(new RowStyle(SizeType.Absolute,49));table.RowStyles.Add(new RowStyle(SizeType.Absolute,49));
+  var dialog=new Form{Text="設定 | BVE 起動ランチャー",Size=new Size(850,650),MinimumSize=new Size(640,580),StartPosition=FormStartPosition.CenterParent,Font=new Font("Yu Gothic UI",10),BackColor=Color.FromArgb(245,248,252)};
+  var table=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=9,Padding=new Padding(22,18,22,16)};dialog.Controls.Add(table);
+  table.RowStyles.Add(new RowStyle(SizeType.Absolute,45));for(int i=0;i<4;i++)table.RowStyles.Add(new RowStyle(SizeType.Absolute,59));table.RowStyles.Add(new RowStyle(SizeType.Absolute,58));table.RowStyles.Add(new RowStyle(SizeType.Percent,100));table.RowStyles.Add(new RowStyle(SizeType.Absolute,49));table.RowStyles.Add(new RowStyle(SizeType.Absolute,49));
   table.Controls.Add(new Label{Text="BVEとBveEXの場所",Dock=DockStyle.Fill,ForeColor=Color.FromArgb(27,48,77),Font=new Font("Yu Gothic UI",13,FontStyle.Bold),TextAlign=ContentAlignment.MiddleLeft},0,0);
   var p6=new TextBox{Text=exe.Text,ReadOnly=true};var p5=new TextBox{Text=exe5.Text,ReadOnly=true};var x6=new TextBox{ReadOnly=true};var x5=new TextBox{ReadOnly=true};
   Action refresh=()=>{x6.Text=BveExLocation.Resolve(p6.Text)??"未確認";x5.Text=BveExLocation.Resolve(p5.Text)??"未確認";};
   p6.TextChanged+=(s,e)=>{exe.Text=p6.Text;refresh();};p5.TextChanged+=(s,e)=>{exe5.Text=p5.Text;refresh();};
   table.Controls.Add(SettingsRow(ExecutablePicker("BVE6本体",p6,6,dialog)),0,1);table.Controls.Add(SettingsRow(BveExPicker("BveEX (BVE6)",p6,x6,dialog)),0,2);
   table.Controls.Add(SettingsRow(ExecutablePicker("BVE5本体",p5,5,dialog)),0,3);table.Controls.Add(SettingsRow(BveExPicker("BveEX (BVE5)",p5,x5,dialog)),0,4);refresh();
-  table.Controls.Add(new Label{Text="BveEXの場所を選ぶと、そのBVE側の設定ファイルを変更します。管理者権限の確認が表示されます。\nBveEX本体の導入や有効化は、配布元の手順に従ってください。",Dock=DockStyle.Fill,ForeColor=Color.FromArgb(100,115,135),TextAlign=ContentAlignment.MiddleLeft},0,5);
+  var nameSetting=new CheckBox{Text="ルート名を自分用に設定",Dock=DockStyle.Fill,AutoSize=false,Checked=RouteDisplayNames.Enabled,Font=new Font("Yu Gothic UI",10,FontStyle.Bold)};
+  nameSetting.AccessibleDescription="オンにすると路線・車両選択画面でルートに自分用の名前を付けて保存できます。";
+  bool revertingNameSetting=false;
+  nameSetting.CheckedChanged+=(s,e)=>{
+   if(revertingNameSetting)return;
+   try{RouteDisplayNames.SetEnabled(nameSetting.Checked);}
+   catch(Exception ex){
+    Diagnostics.Write("ROUTE_NAME_SETTING_ERROR",ex.Message);
+    revertingNameSetting=true;nameSetting.Checked=RouteDisplayNames.Enabled;revertingNameSetting=false;
+    MessageBox.Show(dialog,"設定を保存できませんでした。\n"+ex.Message,"ルート名の設定",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+   }
+  };
+  table.Controls.Add(SettingsRow(nameSetting),0,5);
+  table.Controls.Add(new Label{Text="オンにすると、詳細選択画面でルートを選んだ際に自分用の名前を保存できます。\n元のシナリオやマップファイルは変更しません。",Dock=DockStyle.Fill,ForeColor=Color.FromArgb(100,115,135),TextAlign=ContentAlignment.MiddleLeft},0,6);
   var topActions=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=3,RowCount=1};
   var bottomActions=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=3,RowCount=1};
   foreach(var actions in new[]{topActions,bottomActions})for(int i=0;i<3;i++)actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100f/3));
-  table.Controls.Add(topActions,0,6);table.Controls.Add(bottomActions,0,7);
+  table.Controls.Add(topActions,0,7);table.Controls.Add(bottomActions,0,8);
   var logs=new Button{Text="ログを表示",Dock=DockStyle.Fill,Margin=new Padding(3)};logs.Click+=(s,e)=>Diagnostics.Show(dialog);topActions.Controls.Add(logs,0,0);
   var terms=new Button{Text="利用規約",Dock=DockStyle.Fill,Margin=new Padding(3)};terms.Click+=(s,e)=>ShowTerms(dialog);topActions.Controls.Add(terms,1,0);
   var distribution=new Button{Text="配布サイトを開く",Dock=DockStyle.Fill,Margin=new Padding(3)};
