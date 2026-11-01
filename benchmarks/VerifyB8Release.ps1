@@ -32,7 +32,9 @@ try {
 $portableZip=Join-Path $asset 'BVE6Launcher-0.29b8-Portable.zip'
 $portable=[IO.Compression.ZipFile]::OpenRead($portableZip)
 try {
-    $entry=@($portable.Entries|Where-Object{$_.FullName -match '/BVE6互換ランチャー\.exe$'})|Select-Object -First 1
+    $entry=$portable.Entries | Where-Object {
+        $_.Name -eq 'BVE6互換ランチャー.exe'
+    } | Select-Object -First 1
     if($null -eq $entry){throw 'Portable launcher not in published archive'}
     $tmp=Join-Path $env:TEMP ([guid]::NewGuid().ToString('N')+'.exe')
     try{

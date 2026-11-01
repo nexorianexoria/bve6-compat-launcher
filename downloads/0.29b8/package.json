@@ -1,0 +1,7 @@
+{
+    "version":  "0.2.9.19",
+    "displayVersion":  "0.29b8",
+    "url":  "https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29b8/BVE6Launcher-package.zip",
+    "sha256":  "32390CBF2CEE31BB483D0FC064675C8A5C5B10F3A58CB39ACD23492A5C2C2A23",
+    "notes":  "0.29b8：配布パッケージに旧実行ファイルが混入していた問題を修正しました。"
+}

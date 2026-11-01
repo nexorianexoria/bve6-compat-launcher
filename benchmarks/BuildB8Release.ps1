@@ -55,11 +55,9 @@ try {
     $json=$manifest|ConvertTo-Json -Depth 5
     [IO.File]::WriteAllText((Join-Path $out 'package.json'),$json,[Text.UTF8Encoding]::new($false))
     [IO.File]::WriteAllText((Join-Path $root 'update.json'),$json,[Text.UTF8Encoding]::new($false))
-    # HEAD is the tested source commit; publishing assets is a follow-up commit.
-    $sourceZip=Join-Path $out 'BVE6Launcher-0.29b8-Source.zip'
-    & git archive --format=zip ('--output='+$sourceZip) HEAD
-    if($LASTEXITCODE -ne 0){throw 'Could not archive the committed source'}
-    $files=@('BVE6Launcher-0.29b8-Portable.zip','BVE6Launcher-0.29b8-Source.zip','BVE6Launcher-Setup.exe','BVE6Launcher-package.zip')
+    # GitHub provides a source archive automatically. Do not attach duplicate
+    # archives, checksums or internal updater packages to the user-facing release.
+    $files=@('BVE6Launcher-0.29b8-Portable.zip','BVE6Launcher-Setup.exe','BVE6Launcher-package.zip')
     $sums=foreach($file in $files){$hash=(Get-FileHash -LiteralPath (Join-Path $out $file) -Algorithm SHA256).Hash.ToLowerInvariant();$hash+'  downloads/0.29b8/'+$file}
     [IO.File]::WriteAllLines((Join-Path $out 'SHA256SUMS.txt'),[string[]]$sums,[Text.UTF8Encoding]::new($false))
     Write-Output 'B8_PACKAGE_CREATED'

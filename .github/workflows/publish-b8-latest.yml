@@ -24,7 +24,6 @@ jobs:
         run: |
           set -euo pipefail
           test -s downloads/0.29b8/BVE6Launcher-0.29b8-Portable.zip
-          test -s downloads/0.29b8/BVE6Launcher-0.29b8-Source.zip
           test -s downloads/0.29b8/BVE6Launcher-Setup.exe
           test -s downloads/0.29b8/BVE6Launcher-package.zip
           test -s downloads/0.29b8/SHA256SUMS.txt
@@ -40,18 +39,16 @@ jobs:
           if gh release view v0.29b8 >/dev/null 2>&1; then
             gh release upload v0.29b8 \
               downloads/0.29b8/BVE6Launcher-0.29b8-Portable.zip \
-              downloads/0.29b8/BVE6Launcher-0.29b8-Source.zip \
-              downloads/0.29b8/BVE6Launcher-Setup.exe \
-              downloads/0.29b8/BVE6Launcher-package.zip \
-              downloads/0.29b8/SHA256SUMS.txt --clobber
+              downloads/0.29b8/BVE6Launcher-Setup.exe --clobber
+            # Only the two user-facing downloads belong on the release page.
+            for extra in BVE6Launcher-0.29b8-Source.zip BVE6Launcher-package.zip SHA256SUMS.txt; do
+              gh release delete-asset v0.29b8 "$extra" --yes 2>/dev/null || true
+            done
             gh release edit v0.29b8 --notes-file RELEASE_NOTES_0.29b8_PUBLIC.md --latest
           else
             gh release create v0.29b8 \
               downloads/0.29b8/BVE6Launcher-0.29b8-Portable.zip \
-              downloads/0.29b8/BVE6Launcher-0.29b8-Source.zip \
               downloads/0.29b8/BVE6Launcher-Setup.exe \
-              downloads/0.29b8/BVE6Launcher-package.zip \
-              downloads/0.29b8/SHA256SUMS.txt \
               --target "$GITHUB_SHA" \
               --title "Ver.0.29b8 — BVE6互換ランチャー" \
               --notes-file RELEASE_NOTES_0.29b8_PUBLIC.md \
