@@ -1,7 +1,7 @@
 {
-  "version": "0.2.9.14",
-  "displayVersion": "0.29b3",
-  "url": "https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29b3/BVE6Launcher-package.zip",
-  "sha256": "C6F22694D73C1F331150F5F96E6D5EB743090903DD5A4B43A815645E292EADD4",
-  "notes": "路線・車両のBVE5/BVE6ラベル表示を整理し、シナリオに合わせて起動ボタンを優先表示するように改善しました。更新内容を確認できる専用画面と、更新完了後の自動起動選択を追加しました。"
+    "version":  "0.2.9.16",
+    "displayVersion":  "0.29b5",
+    "url":  "https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29b5/BVE6Launcher-package.zip",
+    "sha256":  "BDE04E805BF060B959DACEC1CD3C3A526F2539B513DF6D593A97DBFC8DDA4E06",
+    "notes":  "0.29b5：32ビットATS互換ブリッジを改善し、起動時の更新確認とインストーラーを復旧しました。通常起動の詳細計測はOFFです。"
 }

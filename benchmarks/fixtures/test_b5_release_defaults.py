@@ -27,8 +27,9 @@ class TestReleaseDefaults(unittest.TestCase):
     def test_ui_and_binary_version_are_b5(self):
         self.assertIn('public const string Display="0.29b5"', RELEASE)
         self.assertIn('public const string Number="0.2.9.16"', RELEASE)
-        self.assertIn('（b5完成候補）', SOURCE)
+        self.assertIn('AutoUpdate.Check(this)', SOURCE)
         self.assertNotIn('（b5開発版）', SOURCE)
+        self.assertIn('Release.Display+" 正式版"', SOURCE)
 
 if __name__ == "__main__":
     unittest.main()

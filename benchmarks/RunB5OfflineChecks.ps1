@@ -63,6 +63,7 @@ foreach($test in @(
  'test_b5_fast_array.py',
  'test_b5_hotpath_buffers.py',
  'test_b5_release_defaults.py',
+ 'test_b5_update_startup.py',
  'test_b5_cpu_frames.py',
  'test_pipe_stalls.py',
  'test_correlate_b5_qpc.py',
