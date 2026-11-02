@@ -7,6 +7,11 @@ extern "C" {
 #include "../../src/bridge/atsplugin.h"
 
 // Test-only, deterministic 32-bit ATS. Never distribute as a real vehicle ATS.
+int test_last_ats_key = -1;
+int test_last_horn_type = -1;
+int test_key_down_count = 0;
+int test_key_up_count = 0;
+int test_horn_count = 0;
 void WINAPI Load(void) {}
 void WINAPI Dispose(void) {}
 int WINAPI GetPluginVersion(void) { return ATS_VERSION; }
@@ -39,6 +44,15 @@ ATS_HANDLES WINAPI Elapse(ATS_VEHICLESTATE state, int* panel, int* sound) {
     if (sound) {
         sound[0] = 0;
         sound[255] = -20000;
+        if (GetEnvironmentVariableA("BVE5COMPAT_TEST_INPUT_DIAGNOSTICS",nullptr,0) > 0) {
+            sound[31] = test_last_horn_type == 0 ? ATS_SOUND_PLAY : ATS_SOUND_STOP;
+            sound[33] = test_last_ats_key == 7 ? ATS_SOUND_PLAY : ATS_SOUND_STOP;
+        }
+        if (GetEnvironmentVariableA("BVE5COMPAT_TEST_PARALLEL_INPUT",nullptr,0) > 0) {
+            sound[40] = test_key_down_count;
+            sound[41] = test_key_up_count;
+            sound[42] = test_horn_count;
+        }
         // Offline test-only varying brake sound state to exercise the
         // host's diagnostic event log without an actual vehicle ATS.
         char cycle_text[32]{};
@@ -65,9 +79,9 @@ ATS_HANDLES WINAPI Elapse(ATS_VEHICLESTATE state, int* panel, int* sound) {
 void WINAPI SetPower(int) {}
 void WINAPI SetBrake(int) {}
 void WINAPI SetReverser(int) {}
-void WINAPI KeyDown(int) {}
-void WINAPI KeyUp(int) {}
-void WINAPI HornBlow(int) {}
+void WINAPI KeyDown(int key) { test_last_ats_key=key; ++test_key_down_count; }
+void WINAPI KeyUp(int) { ++test_key_up_count; }
+void WINAPI HornBlow(int type) { test_last_horn_type=type; ++test_horn_count; }
 void WINAPI DoorOpen(void) {}
 void WINAPI DoorClose(void) {}
 void WINAPI SetSignal(int) {}

@@ -5,6 +5,7 @@
 #define ATS_EXPORTS
 
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstddef>
 #include <filesystem>
@@ -20,7 +21,8 @@ namespace {
     HANDLE pipe_to_backend, pipe_from_backend;
     HANDLE pipe_read_event = NULL;
     HANDLE backend_process = NULL;
-    bool backend_failed = false;
+    std::atomic<bool> backend_failed{false};
+    SRWLOCK backend_write_lock = SRWLOCK_INIT;
     unsigned long long roundtrip_frames = 0;
     unsigned long long roundtrip_total_us = 0;
     unsigned long long roundtrip_max_us = 0;
@@ -111,12 +113,16 @@ namespace {
     std::array<std::string, diagnostic_capacity> diagnostic_lines{};
     size_t diagnostic_line_count = 0;
     unsigned long long diagnostic_lines_dropped = 0;
+    SRWLOCK diagnostic_lock = SRWLOCK_INIT;
     void buffer_diagnostic(std::string value) {
+        AcquireSRWLockExclusive(&diagnostic_lock);
         if (diagnostic_line_count >= diagnostic_capacity) {
             ++diagnostic_lines_dropped;
+            ReleaseSRWLockExclusive(&diagnostic_lock);
             return;
         }
         diagnostic_lines[diagnostic_line_count++] = std::move(value);
+        ReleaseSRWLockExclusive(&diagnostic_lock);
     }
     std::wstring environment_value(const wchar_t* name);
 
@@ -161,8 +167,7 @@ namespace {
     }
 
     void fail_backend(const char* reason) {
-        if (backend_failed) return;
-        backend_failed = true;
+        if (backend_failed.exchange(true)) return;
         DWORD exit_code = STILL_ACTIVE;
         if (backend_process != NULL) GetExitCodeProcess(backend_process, &exit_code);
         const std::wstring log_path = environment_value(L"BVE5COMPAT_LOG");
@@ -224,18 +229,29 @@ namespace {
 
     bool send_to_backend(std::string_view data) {
         if (backend_failed || pipe_to_backend == NULL) return false;
+        // Input callbacks can run concurrently with Elapse. Send one complete
+        // record at a time to avoid corruption and lost key/horn events.
+        AcquireSRWLockExclusive(&backend_write_lock);
+        if (backend_failed || pipe_to_backend == NULL) {
+            ReleaseSRWLockExclusive(&backend_write_lock);
+            return false;
+        }
         size_t offset = 0;
+        bool success = true;
         while (offset < data.size()) {
             const size_t remaining = data.size() - offset;
             const DWORD requested = static_cast<DWORD>(
                 remaining > MAXDWORD ? MAXDWORD : remaining);
             DWORD written = 0;
             if (!WriteFile(pipe_to_backend, data.data() + offset,
-                    requested, &written, NULL) || written == 0)
-                return false;
+                    requested, &written, NULL) || written == 0) {
+                success = false;
+                break;
+            }
             offset += written;
         }
-        return true;
+        ReleaseSRWLockExclusive(&backend_write_lock);
+        return success;
     }
 
     bool receive_from_backend(char* destination, size_t capacity, size_t& received) {
@@ -618,19 +634,34 @@ ATS_API void WINAPI SetReverser(int notch) {
 ATS_API void WINAPI KeyDown(int key) {
     std::ostringstream s;
     s << "KeyDown " << key << std::endl;
-    send_to_backend(std::move(s).str());
+    const bool sent = send_to_backend(std::move(s).str());
+    if (!environment_value(L"BVE5COMPAT_LOG").empty()) {
+        buffer_diagnostic("FRONTEND_INPUT event=KeyDown code=" + std::to_string(key)
+            + " sent=" + (sent ? "1" : "0")
+            + " tick=" + std::to_string(GetTickCount64()));
+    }
 }
 
 ATS_API void WINAPI KeyUp(int key) {
     std::ostringstream s;
     s << "KeyUp " << key << std::endl;
-    send_to_backend(std::move(s).str());
+    const bool sent = send_to_backend(std::move(s).str());
+    if (!environment_value(L"BVE5COMPAT_LOG").empty()) {
+        buffer_diagnostic("FRONTEND_INPUT event=KeyUp code=" + std::to_string(key)
+            + " sent=" + (sent ? "1" : "0")
+            + " tick=" + std::to_string(GetTickCount64()));
+    }
 }
 
 ATS_API void WINAPI HornBlow(int type) {
     std::ostringstream s;
     s << "HornBlow " << type << std::endl;
-    send_to_backend(std::move(s).str());
+    const bool sent = send_to_backend(std::move(s).str());
+    if (!environment_value(L"BVE5COMPAT_LOG").empty()) {
+        buffer_diagnostic("FRONTEND_INPUT event=HornBlow code=" + std::to_string(type)
+            + " sent=" + (sent ? "1" : "0")
+            + " tick=" + std::to_string(GetTickCount64()));
+    }
 }
 
 ATS_API void WINAPI DoorOpen() {

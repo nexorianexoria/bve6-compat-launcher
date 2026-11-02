@@ -276,6 +276,15 @@ int main(int argc, char** argv) {
     Init init = reinterpret_cast<Init>(GetProcAddress(module,"Initialize"));
     ElapseFn elapse = reinterpret_cast<ElapseFn>(GetProcAddress(module,"Elapse"));
     if (!load || !dispose || !spec || !init || !elapse) return 5;
+    using InputFn = void (WINAPI*)(int);
+    InputFn keyDown = reinterpret_cast<InputFn>(GetProcAddress(module,"KeyDown"));
+    InputFn keyUp = reinterpret_cast<InputFn>(GetProcAddress(module,"KeyUp"));
+    InputFn horn = reinterpret_cast<InputFn>(GetProcAddress(module,"HornBlow"));
+    const bool check_inputs =
+        GetEnvironmentVariableA("BVE5COMPAT_TEST_INPUT_DIAGNOSTICS",nullptr,0) > 0;
+    const bool parallel_inputs =
+        GetEnvironmentVariableA("BVE5COMPAT_TEST_PARALLEL_INPUT",nullptr,0) > 0;
+    if ((check_inputs || parallel_inputs) && (!keyDown || !keyUp || !horn)) return 14;
     load();
     ATS_VEHICLESPEC vehicle{};
     vehicle.BrakeNotches = 8;
@@ -314,7 +323,18 @@ int main(int argc, char** argv) {
     if (cadence_us < 0 || pause_frame < 0) return 8;
     const auto cadence_start = std::chrono::steady_clock::now();
     unsigned long long max_elapse_us = 0;
+    std::thread parallel_keys, parallel_horn;
+    if (parallel_inputs) {
+        parallel_keys = std::thread([&] {
+            for (int i = 0; i < 80; ++i) { keyDown(7); keyUp(7); }
+        });
+        parallel_horn = std::thread([&] {
+            for (int i = 0; i < 80; ++i) horn(0);
+        });
+    }
     for(int i=0;i<frames;i++) {
+        if (check_inputs && i == 5) { keyDown(7); horn(0); }
+        if (check_inputs && i == 6) keyUp(7);
         if (cadence_us) {
             const auto target = cadence_start + std::chrono::microseconds(
                 static_cast<long long>(i) * cadence_us);
@@ -338,6 +358,13 @@ int main(int argc, char** argv) {
                 i,result.Brake,result.Power,panel[0]);
             dispose();
             return 7;
+        }
+        if (check_inputs && i>=5 &&
+            (sound[31]!=ATS_SOUND_PLAY || sound[33]!=ATS_SOUND_PLAY)) {
+            std::fprintf(stderr,"key/horn input was lost at frame %d: horn=%d key=%d\n",
+                i,sound[31],sound[33]);
+            dispose();
+            return 15;
         }
         // b5 regression: frontend's periodic diagnostics must not be
         // written to bridge.log from the running driving thread.
@@ -366,6 +393,19 @@ int main(int argc, char** argv) {
                     }
                 }
             }
+        }
+    }
+    if (parallel_keys.joinable()) parallel_keys.join();
+    if (parallel_horn.joinable()) parallel_horn.join();
+    if (parallel_inputs) {
+        ATS_VEHICLESTATE endstate{};
+        endstate.Time=frames*16;
+        elapse(endstate,panel,sound);
+        if (sound[40] != 80 || sound[41] != 80 || sound[42] != 80) {
+            std::fprintf(stderr,"parallel inputs lost: down=%d up=%d horn=%d\n",
+                sound[40],sound[41],sound[42]);
+            dispose();
+            return 16;
         }
     }
     dispose();

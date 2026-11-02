@@ -197,6 +197,49 @@ namespace
     float max_mr_pressure = std::numeric_limits<float>::lowest();
     unsigned long long set_brake_calls = 0;
     int last_brake_notch = std::numeric_limits<int>::min();
+    // Capture ATS sound slots used by the vehicle's HornMaster, but do not
+    // mutate sound values. Buffer transitions to avoid per-frame log I/O.
+    constexpr size_t horn_sound_capacity = 512;
+    struct HornSoundEvent {
+        unsigned long long frame;
+        unsigned int index;
+        int sound_state;
+        int time;
+        float speed;
+        float bc;
+    };
+    std::array<HornSoundEvent, horn_sound_capacity> horn_sound_events{};
+    std::array<int,4> previous_horn_sounds{};
+    bool have_previous_horn_sound = false;
+    size_t horn_sound_count = 0;
+    unsigned long long horn_sound_dropped = 0;
+    void capture_horn_sound_changes(const int* sounds, const ATS_VEHICLESTATE& vehicle) {
+        if (!event_log) return;
+        for (size_t i = 0; i < 4; ++i) {
+            const int current = sounds[31 + i];
+            if (!have_previous_horn_sound || previous_horn_sounds[i] != current) {
+                if (horn_sound_count < horn_sound_capacity)
+                    horn_sound_events[horn_sound_count++] = {
+                        elapse_frames, static_cast<unsigned int>(31 + i),
+                        current, vehicle.Time, vehicle.Speed, vehicle.BcPressure };
+                else ++horn_sound_dropped;
+            }
+            previous_horn_sounds[i] = current;
+        }
+        have_previous_horn_sound = true;
+    }
+    void flush_horn_sound_diagnostics() {
+        if (!event_log) return;
+        for (size_t i = 0; i < horn_sound_count; ++i) {
+            const auto& sample = horn_sound_events[i];
+            event_log << "HORN_SOUND frame=" << sample.frame
+                << " index=" << sample.index << " state=" << sample.sound_state
+                << " time=" << sample.time << " speed=" << sample.speed
+                << " bc=" << sample.bc << '\n';
+        }
+        event_log << "HORN_SOUND_BUFFER_SUMMARY stored=" << horn_sound_count
+            << " dropped=" << horn_sound_dropped << std::endl;
+    }
 
     LONG WINAPI log_unhandled_exception(EXCEPTION_POINTERS* info)
     {
@@ -404,6 +447,7 @@ namespace
             }
             else if (command == "Dispose"sv) {
                 flush_brake_sound_diagnostics();
+                flush_horn_sound_diagnostics();
                 if (event_log && elapse_frames > 0) {
                     event_log << "METRICS host_elapse_frames=" << elapse_frames
                         << " avg_us=" << (elapse_total_us / elapse_frames)
@@ -538,6 +582,7 @@ namespace
                         previous_brake_sound[i] = state_value;
                     }
                     have_previous_brake_sound = true;
+                    capture_horn_sound_changes(sounds, state);
                     const auto diagnostics_done = std::chrono::steady_clock::now();
                     std::array<char, 8192> response_bytes;
                     fixed_output_streambuf response_buffer(
@@ -595,18 +640,27 @@ namespace
             else if (command == "KeyDown"sv) {
                 int key;
                 if (line >> key) {
+                    active_ats_call = "KeyDown";
+                    if (event_log) event_log << "INPUT_KEY_DOWN code=" << key
+                        << " tick=" << GetTickCount64() << std::endl;
                     keyDown(key);
                 }
             }
             else if (command == "KeyUp"sv) {
                 int key;
                 if (line >> key) {
+                    active_ats_call = "KeyUp";
+                    if (event_log) event_log << "INPUT_KEY_UP code=" << key
+                        << " tick=" << GetTickCount64() << std::endl;
                     keyUp(key);
                 }
             }
             else if (command == "HornBlow"sv) {
                 int type;
                 if (line >> type) {
+                    active_ats_call = "HornBlow";
+                    if (event_log) event_log << "INPUT_HORN type=" << type
+                        << " tick=" << GetTickCount64() << std::endl;
                     hornBlow(type);
                 }
             }
