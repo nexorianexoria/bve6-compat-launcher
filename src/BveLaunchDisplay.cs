@@ -4,6 +4,8 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Collections.Generic;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -52,6 +54,49 @@ internal static class BveLaunchDisplay {
     private static extern bool IsWindowVisible(IntPtr hWnd);
     [DllImport("user32.dll",SetLastError=true)]
     private static extern bool SetWindowPos(IntPtr hWnd,IntPtr after,int x,int y,int width,int height,uint flags);
+    [DllImport("user32.dll")]
+    private static extern bool EnumWindows(WindowEnumerator callback,IntPtr context);
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd,out uint processId);
+    [DllImport("user32.dll",CharSet=CharSet.Unicode,SetLastError=true)]
+    private static extern int GetWindowText(IntPtr hWnd,StringBuilder caption,int length);
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowRect(IntPtr hWnd,out NativeRect rect);
+    private delegate bool WindowEnumerator(IntPtr hWnd,IntPtr context);
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativeRect {internal int Left,Top,Right,Bottom;}
+    internal sealed class WindowTarget {
+        internal IntPtr Handle;
+        internal bool ScenarioPicker;
+        internal Rectangle Bounds;
+    }
+    // BVE opens a separate modal scenario-selection dialog. Both that dialog
+    // and the main BVE window must follow the requested monitor. Do not move
+    // arbitrary BVE-owned plugin, HUD or error windows.
+    internal static List<WindowTarget> FindBveWindows(int pid) {
+        var found=new List<WindowTarget>();
+        WindowEnumerator inspect=(handle,unused)=>{
+            uint owner;
+            GetWindowThreadProcessId(handle,out owner);
+            if(owner!=(uint)pid || !IsWindowVisible(handle))return true;
+            var title=new StringBuilder(256);
+            GetWindowText(handle,title,title.Capacity);
+            bool main=title.ToString().StartsWith("BVE Trainsim",StringComparison.OrdinalIgnoreCase);
+            bool chooser=title.ToString()=="シナリオの選択";
+            if(!main && !chooser)
+                return true;
+            NativeRect rect;
+            if(!GetWindowRect(handle,out rect))return true;
+            int width=rect.Right-rect.Left;
+            int height=rect.Bottom-rect.Top;
+            if(width<320 || height<200)return true;
+            found.Add(new WindowTarget{Handle=handle,ScenarioPicker=chooser,
+                Bounds=new Rectangle(rect.Left,rect.Top,width,height)});
+            return true;
+        };
+        EnumWindows(inspect,IntPtr.Zero);
+        return found;
+    }
     // Testable helper: move only this BVE process window, never a global monitor.
     internal static bool MoveWindow(IntPtr handle,Rectangle workingArea,int width,int height){
         if(handle==IntPtr.Zero || workingArea.Width<=0 || workingArea.Height<=0)return false;
@@ -63,7 +108,11 @@ internal static class BveLaunchDisplay {
     }
 
     internal static void ArrangeWhenReady(int pid,int version) {
-        var display=Read(version);
+        ArrangeWhenReady(pid,version,Read(version));
+    }
+    // A caller-specified display is useful for isolated integration tests:
+    // it does not save or alter the user's own monitor preference.
+    internal static void ArrangeWhenReady(int pid,int version,string display) {
         if(String.IsNullOrWhiteSpace(display))return;
         Screen screen=Screen.AllScreens.FirstOrDefault(s=>
             String.Equals(s.DeviceName,display,StringComparison.OrdinalIgnoreCase));
@@ -76,30 +125,33 @@ internal static class BveLaunchDisplay {
                         Diagnostics.Write("BVE_MONITOR","全画面表示のためモニターの移動は行いません。");
                         return;
                     }
-                    IntPtr moved=IntPtr.Zero;
+                    var moved=new HashSet<IntPtr>();
                     // Some versions recreate the main window after loading a
                     // scenario. Reposition new handles only, never repeatedly
                     // drag a window the user has already moved by hand.
                     for(int i=0;i<100;i++){
                         if(bve.HasExited)return;
-                        bve.Refresh();
-                        var handle=bve.MainWindowHandle;
-                        if(handle!=IntPtr.Zero && handle!=moved && IsWindowVisible(handle)){
+                        foreach(var target in FindBveWindows(pid).OrderBy(x=>x.ScenarioPicker)){
+                            var handle=target.Handle;
+                            if(moved.Contains(handle))continue;
                             Rectangle area=screen.WorkingArea;
-                            int width=Math.Min(preferences.Width,area.Width);
-                            int height=Math.Min(preferences.Height,area.Height);
+                            int width=Math.Min(target.ScenarioPicker?
+                                target.Bounds.Width:preferences.Width,area.Width);
+                            int height=Math.Min(target.ScenarioPicker?
+                                target.Bounds.Height:preferences.Height,area.Height);
                             int x=area.Left+(area.Width-width)/2;
                             int y=area.Top+(area.Height-height)/2;
                             if(MoveWindow(handle,area,width,height)){
-                                moved=handle;
+                                moved.Add(handle);
                                 Diagnostics.Write("BVE_MONITOR","pid="+pid+" monitor="+display+
+                                    " window="+(target.ScenarioPicker?"scenario-picker":"main")+
                                     " bounds="+x+","+y+","+width+","+height);
                             }else Diagnostics.Write("BVE_MONITOR",
                                 "移動できませんでした。Windows error="+Marshal.GetLastWin32Error());
                         }
                         Thread.Sleep(500);
                     }
-                    if(moved==IntPtr.Zero)
+                    if(moved.Count==0)
                         Diagnostics.Write("BVE_MONITOR","起動したBVEのウィンドウを確認できませんでした。");
                 }
             }catch(Exception ex){Diagnostics.Write("BVE_MONITOR",ex.Message);}

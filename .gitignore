@@ -18,6 +18,7 @@ dist-b10-release/
 dist-b9-ats-baseline-test/
 dist-b9-ats-input-test/
 downloads/0.29b10/
+benchmarks/b11-real-window-*/
 benchmarks/__pycache__/
 *.pyc
 src/bridge/**/Release/

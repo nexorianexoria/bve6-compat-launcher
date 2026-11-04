@@ -19,6 +19,8 @@ The published b9 update manifest and the installed application are unchanged.
 - Monitors are enumerated from the current Windows display topology; the
   selected monitor is stored in a launcher-specific XML file in LocalAppData.
   After BVE starts, only the launched BVE process window is moved via SetWindowPos;
+  the separate native `シナリオの選択` dialog is also moved to the selected
+  monitor without changing its own size;
   primary-display selection and Windows display resolution are untouched.
   Fullscreen monitor movement is not supported (BVE decides where fullscreen is).
 - Additional input-device plugins can be toggled from the native
@@ -48,6 +50,28 @@ The published b9 update manifest and the installed application are unchanged.
 - A Windows Defender custom scan of the development launcher reported no
   new threat for this executable. This does not constitute a guarantee of safety.
 
+## Real BVE6 start-menu integration verification (2026-11-04)
+
+- Launched the installed BVE6 executable at
+  `C:/Program Files/mackoy/BveTs6/BveTs.exe` without opening a route.
+  The test supplied DISPLAY3 to the launcher monitor-placement hook without
+  saving or modifying the user's launcher monitor preference.
+- BVE creates two visible top-level windows, the main `BVE Trainsim 6`
+  and a modal `シナリオの選択` form. The first test showed that moving just
+  the BVE main window did NOT reliably move the separate picker.
+- Updated the window selector to recognize both BVE-native windows,
+  ignore plugin/HUD/other windows, preserve the picker size and center both.
+- The subsequent actual BVE6 test verified the main window and scenario
+  picker both centered on the selected DISPLAY3 monitor after 9 seconds.
+- Closed the test-created native scenario dialog using WM_CLOSE and then
+  the main BVE window by ordinary CloseMainWindow. The BVE process exited.
+- The test restored the original BVE6 preferences on exit and verified that
+  the launcher's saved monitor preference was never modified.
+- A separate route-based smoke test earlier reported a
+  `Mackoy.Bvets.TsmcInterface.TsmcInterface.DataReadAndLevMov()`
+  NullReferenceException from a BVE input plugin. This is not demonstrated
+  to be caused by the launcher. It remains a separate diagnostic issue.
+
 ## Remaining limitations
 
 - The launcher cannot rewrite or optimize BVE's proprietary rendering engine.
@@ -55,6 +79,6 @@ The published b9 update manifest and the installed application are unchanged.
   rendering range may improve performance at the expense of visible scenery.
 - Device-specific keyboard/button assignment editors beyond the plugin list
   and NumerousController on/off/profile selections are not yet implemented.
-- Target-monitor repositioning has been tested with a synthetic window; the
-  real BVE window has not been moved while this user was driving.
+- Real BVE6 start-menu and scenario-picker placement was verified. The
+  driving window (after a route loads) has not been tested in this version.
 - Do not publish as a release until the actual BVE launch is confirmed.

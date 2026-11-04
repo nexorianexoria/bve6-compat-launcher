@@ -70,10 +70,6 @@ internal sealed class BveOptionsDialog : Form {
     private static Control Caption(string text) {
         return new Label{Text=text,Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft};
     }
-    private static NumericUpDown Spin(int min,int max,int step) {
-        return new NumericUpDown{Minimum=min,Maximum=max,Increment=step,
-            TextAlign=HorizontalAlignment.Right,Width=118};
-    }
     private static TableLayoutPanel OptionLayout(){
         var table=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,Padding=new Padding(20,16,20,15)};
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,190));
@@ -119,15 +115,20 @@ internal sealed class BveOptionsDialog : Form {
         Add(panel,1,"後方の描画距離",back);
         Add(panel,2,"異方性フィルター",filter);
         var presets=new FlowLayoutPanel{Dock=DockStyle.Fill};
-        var lite=new Button{Text="軽量設定をセット",Width=165,Height=32};
+        var lite=new Button{Text="軽量",Width=100,Height=32};
         lite.Click+=(s,e)=>{front.Value=400;back.Value=30;filter.Value=2;};
-        var undo=new Button{Text="保存前の値に戻す",Width=165,Height=32};
+        var balance=new Button{Text="バランス",Width=110,Height=32};
+        balance.Click+=(s,e)=>{front.Value=800;back.Value=50;filter.Value=8;};
+        var quality=new Button{Text="画質優先",Width=110,Height=32};
+        quality.Click+=(s,e)=>{front.Value=1200;back.Value=100;filter.Value=16;};
+        var undo=new Button{Text="元の値に戻す",Width=125,Height=32};
         undo.Click+=(s,e)=>{if(current!=null){
             front.Value=Math.Min(front.Maximum,Math.Max(front.Minimum,current.DrawDistance));
             back.Value=Math.Min(back.Maximum,Math.Max(back.Minimum,current.BackDrawDistance));
             filter.Value=Math.Min(filter.Maximum,Math.Max(filter.Minimum,current.Anisotropy));
         }};
-        presets.Controls.Add(lite);presets.Controls.Add(undo);
+        presets.Controls.Add(lite);presets.Controls.Add(balance);
+        presets.Controls.Add(quality);presets.Controls.Add(undo);
         Add(panel,3,"かんたん調整",presets,52);
         Add(panel,4,"",new Label{Text="小さい値ほど描画する範囲やフィルターの負荷を減らせます。\n車両・路線によって効果は変わるため、FPS向上は保証されません。\nBVE本体のプログラムや車両データは変更しません。",
             ForeColor=Color.FromArgb(100,115,135),Dock=DockStyle.Fill,
