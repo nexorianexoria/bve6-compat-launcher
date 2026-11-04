@@ -15,6 +15,9 @@ internal static class UpdateHistory {
     }
 
     internal static readonly Entry[] Published={
+        new Entry("0.29b11","2026/11/04",
+            "BVE起動前に画面サイズ・起動モニター・描画負荷と追加入力デバイスを設定可能に。\r\n"+
+            "Windows登録のモニター名・解像度・Hzを表示し、NumerousControllerInterfaceのプロパティー設定に対応。"),
         new Entry("0.29b9","2026/11/01",
             "更新によるタスクバー表示の変化を抑えるため、ランチャーのアプリ識別子を固定。\r\n"+
             "ルート設定に「他の車両から選ぶ」を追加し、通常の車両一覧から選択可能に。"),

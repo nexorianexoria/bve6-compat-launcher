@@ -1,7 +1,7 @@
 {
-    "version":  "0.2.9.20",
-    "displayVersion":  "0.29b9",
-    "url":  "https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29b9/BVE6Launcher-package.zip",
-    "sha256":  "168ACBF45D2C2C4065B0090629625EA2DD1C8797C4BD1C550629ABCC40937DCC",
-    "notes":  "0.29b9：タスクバー表示の改善と、ルート設定の「他の車両から選ぶ」を追加しました。"
+    "version":  "0.2.9.22",
+    "displayVersion":  "0.29b11",
+    "url":  "https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29b11/BVE6Launcher-package.zip",
+    "sha256":  "099B8E27681DB6B88BF30D702B3E0C628C45291C9D19A5B55FEDEBBE6DD6B3F4",
+    "notes":  "0.29b11：BVE起動前の画面サイズ・モニター・描画負荷・追加入力デバイスの設定を追加。Windows登録のモニター名・解像度・Hz表示、マスコンのプロパティー操作を改善しました。"
 }
