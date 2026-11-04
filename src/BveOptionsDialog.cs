@@ -13,10 +13,11 @@ internal sealed class BveOptionsDialog : Form {
     private readonly CheckBox windowed=new CheckBox();
     private readonly NumericUpDown width=new NumericUpDown(),height=new NumericUpDown();
     private readonly NumericUpDown front=new NumericUpDown(),back=new NumericUpDown(),filter=new NumericUpDown();
-    private readonly CheckedListBox plugins=new CheckedListBox(),controllers=new CheckedListBox();
+    private readonly CheckedListBox plugins=new CheckedListBox();
     private readonly Label warning=new Label();
     private readonly Button save=new Button();
-    private readonly Button editProfiles=new Button();
+    private readonly Button pluginProperties=new Button();
+    private readonly Label selectedPluginStatus=new Label();
     private readonly string bve5,bve6;
     private BvePreferences current;
     private List<ControllerSwitch> controllerItems=new List<ControllerSwitch>();
@@ -25,6 +26,23 @@ internal sealed class BveOptionsDialog : Form {
     private sealed class MonitorOption {
         internal string Device,Title;
         public override string ToString(){return Title;}
+    }
+    private sealed class PluginOption {
+        internal string Id;
+        internal string Title;
+        public override string ToString(){return Title;}
+    }
+    private static PluginOption PluginInfo(string id){
+        string name=id;
+        switch((id??"").ToLowerInvariant()){
+            case "bveex.caller.inputdevice":name="BveEX";break;
+            case "kusaanko.numerouscontrollerinterface":
+                name="NumerousControllerInterface";break;
+            case "mackoy.tsmcinterface":name="TSマスコン (Mackoy.TsmcInterface)";break;
+            case "zkns_001interface":name="ZKNS_001interface";break;
+            case "sanyinginput":name="SanYingInput";break;
+        }
+        return new PluginOption{Id=id,Title=name};
     }
 
     internal BveOptionsDialog(string executable5,string executable6){
@@ -100,7 +118,7 @@ internal sealed class BveOptionsDialog : Form {
         Add(panel,1,"ウィンドウサイズ",size);
         screenChoice.DropDownStyle=ComboBoxStyle.DropDownList;
         Add(panel,2,"起動するモニター",screenChoice);
-        var note=new Label{Text="モニターは接続中の画面から選べます。\n選択した画面へ移動するのはウィンドウ表示のときだけです。\n接続が外れた場合はBVEの通常の表示位置を使用します。",
+        var note=new Label{Text="Windowsに登録されたモニター名・解像度・リフレッシュレート（Hz）を表示します。\nHzはモニターの更新頻度です。BVEの実測FPSではありません。\nモニター指定はウィンドウ表示のみ対応しています。",
             Dock=DockStyle.Fill,ForeColor=Color.FromArgb(100,115,135),TextAlign=ContentAlignment.MiddleLeft};
         Add(panel,3,"",note,104);
         windowed.CheckedChanged+=(s,e)=>{screenChoice.Enabled=windowed.Checked;};
@@ -136,33 +154,74 @@ internal sealed class BveOptionsDialog : Form {
         return Page("軽量化・描画",panel);
     }
     private TabPage DevicesPage(){
-        var parent=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=5,Padding=new Padding(15)};
-        parent.RowStyles.Add(new RowStyle(SizeType.Absolute,31));
-        parent.RowStyles.Add(new RowStyle(SizeType.Percent,50));
-        parent.RowStyles.Add(new RowStyle(SizeType.Absolute,40));
-        parent.RowStyles.Add(new RowStyle(SizeType.Percent,50));
-        parent.RowStyles.Add(new RowStyle(SizeType.Absolute,45));
-        parent.Controls.Add(new Label{Text="使用する入力プラグイン（チェックで有効）",
-            Dock=DockStyle.Fill,Font=new Font(Font,FontStyle.Bold)},0,0);
-        plugins.CheckOnClick=true;plugins.Dock=DockStyle.Fill;
-        parent.Controls.Add(plugins,0,1);
-        parent.Controls.Add(new Label{Text="NumerousControllerInterface：使用するマスコンの種類",
+        // Mirror BVE's usual interaction: first check a plugin to enable it,
+        // then select its row and click "Properties..." for its own settings.
+        var parent=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,
+            RowCount=5,Padding=new Padding(15)};
+        parent.RowStyles.Add(new RowStyle(SizeType.Absolute,37));
+        parent.RowStyles.Add(new RowStyle(SizeType.Percent,100));
+        parent.RowStyles.Add(new RowStyle(SizeType.Absolute,50));
+        parent.RowStyles.Add(new RowStyle(SizeType.Absolute,58));
+        parent.RowStyles.Add(new RowStyle(SizeType.Absolute,33));
+        parent.Controls.Add(new Label{
+            Text="追加の入力デバイス（チェックで有効／無効）",
             Dock=DockStyle.Fill,Font=new Font(Font,FontStyle.Bold),
-            Padding=new Padding(0,12,0,0)},0,2);
-        controllers.CheckOnClick=true;controllers.Dock=DockStyle.Fill;
-        parent.Controls.Add(controllers,0,3);
-        editProfiles.Text="マスコンの使用プロファイルを変更";
-        editProfiles.Dock=DockStyle.Fill;editProfiles.Enabled=false;
-        editProfiles.Click+=(s,e)=>{
-            using(var editor=new NumerousProfilesDialog(profileItems)){
-                if(editor.ShowDialog(this)==DialogResult.OK){
-                    profileItems=editor.SelectedProfiles;
-                    warning.Text="プロファイルの変更は「設定を保存」を押すと反映されます。";
-                }
-            }
+            TextAlign=ContentAlignment.MiddleLeft},0,0);
+        // Like BVE's native list, selecting a row for Properties must not
+        // accidentally toggle the input device on/off.
+        plugins.CheckOnClick=false;
+        plugins.Dock=DockStyle.Fill;
+        plugins.IntegralHeight=false;
+        plugins.SelectedIndexChanged+=(s,e)=>RefreshPluginProperties();
+        plugins.ItemCheck+=(s,e)=>{
+            if(!loading && IsHandleCreated)
+                BeginInvoke((Action)(()=>RefreshPluginProperties()));
         };
-        parent.Controls.Add(editProfiles,0,4);
+        parent.Controls.Add(plugins,0,1);
+        var buttons=new FlowLayoutPanel{Dock=DockStyle.Fill,FlowDirection=FlowDirection.RightToLeft};
+        pluginProperties.Text="プロパティー…";
+        pluginProperties.Width=170;pluginProperties.Height=34;
+        pluginProperties.Enabled=false;
+        pluginProperties.Click+=(s,e)=>OpenSelectedPluginProperties();
+        buttons.Controls.Add(pluginProperties);
+        parent.Controls.Add(buttons,0,2);
+        selectedPluginStatus.Dock=DockStyle.Fill;
+        selectedPluginStatus.ForeColor=Color.FromArgb(91,108,129);
+        selectedPluginStatus.TextAlign=ContentAlignment.MiddleLeft;
+        parent.Controls.Add(selectedPluginStatus,0,3);
+        parent.Controls.Add(new Label{
+            Text="BVEと同様に、一覧の項目を選んでから「プロパティー…」を開きます。",
+            ForeColor=Color.FromArgb(91,108,129),
+            Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft},0,4);
         return Page("追加入力デバイス",parent);
+    }
+    private static bool IsNumerousPlugin(string id){
+        return String.Equals(id,"kusaanko.numerouscontrollerinterface",
+            StringComparison.OrdinalIgnoreCase);
+    }
+    private void RefreshPluginProperties(){
+        var plugin=(plugins.SelectedItem as PluginOption)?.Id;
+        bool known=IsNumerousPlugin(plugin);
+        pluginProperties.Enabled=known && !loading &&
+            (controllerItems.Count>0 || profileItems.Count>0);
+        selectedPluginStatus.Text=String.IsNullOrWhiteSpace(plugin)?
+            "一覧の入力プラグインを選択してください。":
+            known?
+                pluginProperties.Enabled?
+                    "NumerousControllerInterface：マスコンの有効／無効・使用プロファイルを設定できます。":
+                    "NumerousControllerInterfaceの設定ファイルがありません。":
+                "このプラグインの独自プロパティー画面はランチャーでの操作に未対応です。";
+    }
+    private void OpenSelectedPluginProperties(){
+        if(loading || !pluginProperties.Enabled)return;
+        if(!IsNumerousPlugin((plugins.SelectedItem as PluginOption)?.Id))return;
+        using(var editor=new NumerousControllerPropertiesDialog(controllerItems,profileItems)){
+            if(editor.ShowDialog(this)==DialogResult.OK){
+                controllerItems=editor.SelectedControllers;
+                profileItems=editor.SelectedProfiles;
+                warning.Text="マスコンの変更は、下の「設定を保存」を押すと反映されます。";
+            }
+        }
     }
     private void RefreshRunningState(){
         if(loading)return;
@@ -188,12 +247,11 @@ internal sealed class BveOptionsDialog : Form {
             screenChoice.Items.Add(new MonitorOption{Title="BVEに任せる",Device=""});
             var chosen=BveLaunchDisplay.Read(version);
             int selected=0,index=0;
-            foreach(var screen in Screen.AllScreens){
+            foreach(var monitor in WindowsMonitorCatalog.GetCurrent()){
                 index++;
-                screenChoice.Items.Add(new MonitorOption{Device=screen.DeviceName,
-                    Title="画面 "+index+(screen.Primary?"（メイン）":"")+" — "+
-                        screen.Bounds.Width+"×"+screen.Bounds.Height+"  "+screen.DeviceName});
-                if(String.Equals(screen.DeviceName,chosen,StringComparison.OrdinalIgnoreCase))
+                screenChoice.Items.Add(new MonitorOption{Device=monitor.Device,
+                    Title=monitor.Label});
+                if(String.Equals(monitor.Device,chosen,StringComparison.OrdinalIgnoreCase))
                     selected=index;
             }
             screenChoice.SelectedIndex=selected;
@@ -201,24 +259,25 @@ internal sealed class BveOptionsDialog : Form {
             plugins.Items.Clear();
             string executable=version==6?bve6:bve5;
             foreach(string plugin in BvePreferencesService.DiscoverPlugins(executable,current.InputPlugins))
-                plugins.Items.Add(plugin,current.InputPlugins.Contains(plugin,StringComparer.OrdinalIgnoreCase));
-            controllers.Items.Clear();
+                plugins.Items.Add(PluginInfo(plugin),
+                    current.InputPlugins.Contains(plugin,StringComparer.OrdinalIgnoreCase));
+            if(plugins.Items.Count>0){
+                var firstChecked=plugins.CheckedIndices.Count>0?plugins.CheckedIndices[0]:0;
+                plugins.SelectedIndex=firstChecked;
+            }
             controllerItems=NumerousControllerSettings.Read(NumerousControllerSettings.PathOnDisk);
-            foreach(var device in controllerItems)
-                controllers.Items.Add(device.Name,device.Enabled);
             profileItems=NumerousControllerSettings.ReadProfiles(NumerousControllerSettings.PathOnDisk);
-            editProfiles.Enabled=profileItems.Count>0;
         }catch(Exception ex){
             current=null;warning.Text="設定を読み込めませんでした: "+ex.Message;
             MessageBox.Show(this,ex.Message,"設定の読み込み",MessageBoxButtons.OK,MessageBoxIcon.Warning);
-        }finally{loading=false;RefreshRunningState();}
+        }finally{loading=false;RefreshRunningState();RefreshPluginProperties();}
     }
     private void SaveSettings(){
         try{
             if(BvePreferencesService.IsGameRunning())throw new InvalidOperationException(
                 "BVEを終了してから保存してください。");
             int version=versionChoice.SelectedIndex==0?6:5;
-            var selected=plugins.CheckedItems.Cast<string>().ToList();
+            var selected=plugins.CheckedItems.Cast<PluginOption>().Select(x=>x.Id).ToList();
             var active=new HashSet<string>(selected,StringComparer.OrdinalIgnoreCase);
             // Preserve the original load order of currently enabled input
             // plugins. Changing their order can affect some controllers.
@@ -232,16 +291,14 @@ internal sealed class BveOptionsDialog : Form {
                 InputPlugins=ordered
             };
             BvePreferencesService.Validate(updated);
-            var deviceChanges=controllerItems.Select((x,i)=>new ControllerSwitch {
-                Name=x.Name,Enabled=controllers.GetItemChecked(i)}).ToList();
             string target=(screenChoice.SelectedItem as MonitorOption)?.Device??"";
             if(!updated.Windowed)target="";
             // Only change settings in response to the explicit Save button.
             // Save each source file with a timestamped backup.
             BvePreferencesService.Save(version,updated);
-            if(deviceChanges.Count>0 || profileItems.Count>0)
+            if(controllerItems.Count>0 || profileItems.Count>0)
                 NumerousControllerSettings.SaveAll(
-                    NumerousControllerSettings.PathOnDisk,deviceChanges,profileItems);
+                    NumerousControllerSettings.PathOnDisk,controllerItems,profileItems);
             BveLaunchDisplay.Save(version,target);
             MessageBox.Show(this,"設定を保存しました。次のBVE起動で反映されます。"+
                 "\nBVEの設定ファイルはバックアップ済みです。","設定を保存",

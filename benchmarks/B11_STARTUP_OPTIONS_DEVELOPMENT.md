@@ -82,3 +82,35 @@ The published b9 update manifest and the installed application are unchanged.
 - Real BVE6 start-menu and scenario-picker placement was verified. The
   driving window (after a route loads) has not been tested in this version.
 - Do not publish as a release until the actual BVE launch is confirmed.
+
+## BVE-style additional input devices and Windows monitor labels
+
+- The input-device tab now follows the BVE UI pattern: checkbox list of
+  installed/enabled input plugins, select an entry, then click
+  `プロパティー…` (Properties). Selecting a row does **not** automatically
+  toggle a plugin's enabled state.
+- Known plugin IDs have human-readable labels, including BveEX and
+  NumerousControllerInterface, while the native identifiers remain
+  unchanged in BVE preferences.
+- The NumerousControllerInterface Properties dialog shows the known
+  controller types, their enabled state, and mapped existing profiles
+  in one view. It edits temporary copies and commits only when the
+  parent BVE settings dialog's Save button is pressed.
+- Proprietary property editors for other input plugins are not
+  impersonated; they remain disabled with an explanation. Exact native
+  third-party configuration UIs are not implemented.
+- `WindowsMonitorCatalog` uses the Windows display ID to match
+  `EnumDisplayDevicesW` with `WmiMonitorID` device instance records,
+  never relying on enumeration order. It retrieves the current full
+  configured resolution and monitor refresh rate via
+  `EnumDisplaySettingsW`, not WinForms screen bounds affected by
+  display scaling.
+- Monitor choices show the Windows-registered user-friendly name,
+  resolution, and refresh rate **Hz** (not actual BVE FPS).
+- Verified on the user's connected displays: LG ULTRAWIDE at
+  2560×1080 100Hz; HISENSE-TV at 3840×2160 120Hz; and DELL S2721QS
+  at 3840×2160 60Hz. Display numbers remain internal IDs only.
+- `TestB11PluginAndMonitorUi.ps1` checks monitor names against
+  actual WmiMonitorID records, verifies Hz/geometry and the resulting
+  combo-box labels, and checks the BVE-like selection and properties
+  editor without modifying user settings.
