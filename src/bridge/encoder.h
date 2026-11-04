@@ -221,23 +221,26 @@ inline bool fast_array_space(int value) noexcept {
         value == '\r' || value == '\f' || value == '\v';
 }
 
-// Decode directly from the stream buffer. This avoids constructing a 2 KiB
-// std::string for each of the panel and sound arrays on every ATS frame.
+// Read 2 KiB in one stream-buffer transfer. The old byte-at-a-time sbumpc
+// path performed an EOF/buffer check for every hexadecimal digit (2048
+// checks per array). Keep exactly the same protocol and validation rules.
+// This uses only stack storage and does not allocate a std::string.
 inline bool read_fast_array(std::istream& in, int* values) {
     std::istream::sentry sentry(in);
     if (!sentry) return false;
 
     std::streambuf* source = in.rdbuf();
+    std::array<char, 2048> encoded{};
+    if (source->sgetn(encoded.data(),
+            static_cast<std::streamsize>(encoded.size())) !=
+            static_cast<std::streamsize>(encoded.size())) {
+        in.setstate(std::ios::failbit);
+        return false;
+    }
     for (size_t i = 0; i < 256; ++i) {
         unsigned int value = 0;
         for (size_t nibble = 0; nibble < 8; ++nibble) {
-            const auto next = source->sbumpc();
-            if (std::char_traits<char>::eq_int_type(
-                    next, std::char_traits<char>::eof())) {
-                in.setstate(std::ios::failbit);
-                return false;
-            }
-            const char digit = std::char_traits<char>::to_char_type(next);
+            const char digit = encoded[i * 8 + nibble];
             unsigned int decoded;
             if (digit >= '0' && digit <= '9') decoded = digit - '0';
             else if (digit >= 'a' && digit <= 'f') decoded = digit - 'a' + 10u;

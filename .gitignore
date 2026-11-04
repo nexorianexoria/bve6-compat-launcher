@@ -16,6 +16,11 @@ dist-b9-release/
 dist-b11-options/
 dist-b11-input-display/
 dist-b11-release/
+dist-b13-perf/
+dist-b12-mita-candidate/
+benchmarks/fixtures/*-codec-benchmark.exe
+benchmarks/fixtures/*-codec-benchmark.obj
+benchmarks/fixtures/_bench_build_baseline.cmd
 dist-b10-release/
 dist-b9-ats-baseline-test/
 dist-b9-ats-input-test/
