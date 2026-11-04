@@ -221,34 +221,41 @@ inline bool fast_array_space(int value) noexcept {
         value == '\r' || value == '\f' || value == '\v';
 }
 
-// Read 2 KiB in one stream-buffer transfer. The old byte-at-a-time sbumpc
-// path performed an EOF/buffer check for every hexadecimal digit (2048
-// checks per array). Keep exactly the same protocol and validation rules.
-// This uses only stack storage and does not allocate a std::string.
+// Read 2 KiB in one stream-buffer transfer. Decode two validated nibbles per
+// byte using an immutable 256-entry lookup table instead of two comparisons
+// for each of the 2048 digits. The wire format, signed integer bit pattern,
+// stream error behavior, and following delimiter remain unchanged.
 inline bool read_fast_array(std::istream& in, int* values) {
     std::istream::sentry sentry(in);
     if (!sentry) return false;
 
     std::streambuf* source = in.rdbuf();
-    std::array<char, 2048> encoded{};
+    std::array<char, 2048> encoded;
     if (source->sgetn(encoded.data(),
             static_cast<std::streamsize>(encoded.size())) !=
             static_cast<std::streamsize>(encoded.size())) {
         in.setstate(std::ios::failbit);
         return false;
     }
+    static constexpr auto hex = [] {
+        std::array<unsigned char, 256> result{};
+        for (auto& element : result) element = 0xff;
+        for (unsigned int digit = 0; digit < 10; ++digit)
+            result['0' + digit] = static_cast<unsigned char>(digit);
+        for (unsigned int digit = 0; digit < 6; ++digit)
+            result['a' + digit] = static_cast<unsigned char>(10 + digit);
+        return result;
+    }();
     for (size_t i = 0; i < 256; ++i) {
         unsigned int value = 0;
-        for (size_t nibble = 0; nibble < 8; ++nibble) {
-            const char digit = encoded[i * 8 + nibble];
-            unsigned int decoded;
-            if (digit >= '0' && digit <= '9') decoded = digit - '0';
-            else if (digit >= 'a' && digit <= 'f') decoded = digit - 'a' + 10u;
-            else {
+        for (size_t byte = 0; byte < 4; ++byte) {
+            const unsigned char high = hex[static_cast<unsigned char>(encoded[i * 8 + byte * 2])];
+            const unsigned char low = hex[static_cast<unsigned char>(encoded[i * 8 + byte * 2 + 1])];
+            if ((high | low) > 15) {
                 in.setstate(std::ios::failbit);
                 return false;
             }
-            value = (value << 4) | decoded;
+            value = (value << 8) | (static_cast<unsigned int>(high) << 4) | low;
         }
         std::memcpy(values + i, &value, sizeof(value));
     }

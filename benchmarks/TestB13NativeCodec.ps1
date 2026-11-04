@@ -1,13 +1,22 @@
 param(
     [ValidateRange(100,100000)][int]$Frames=10000,
-    [ValidateRange(1,10)][int]$Pairs=4
+    [ValidateRange(1,10)][int]$Pairs=4,
+    [string]$BaselineBridgeDir='',
+    [string]$ReportFileName='b13-mock-ab-results.csv'
 )
 $ErrorActionPreference='Stop'
 $root=if($PSScriptRoot){Split-Path -Parent $PSScriptRoot}else{(Get-Location).Path}
 $testDir=Join-Path $root 'dist-b13-perf'
 $mock=Join-Path $root 'dist-b5/bridge-mock/mock_ats.dll'
 $harness=Join-Path $root 'dist-b5/bridge-mock/bridge_harness.exe'
-$baseline=Join-Path $root 'dist-b11-release/bridge'
+$baseline=if([string]::IsNullOrWhiteSpace($BaselineBridgeDir)){
+    Join-Path $root 'dist-b11-release/bridge'
+}else{
+    [IO.Path]::GetFullPath($BaselineBridgeDir)
+}
+if($ReportFileName -notmatch '^[a-zA-Z0-9_-]+\.csv$'){
+    throw 'ReportFileName must be a CSV filename without path separators'
+}
 $candidates=@{
     baseline=@(
         (Join-Path $baseline 'Bve5VehicleCompatibility_.dll'),
@@ -77,7 +86,7 @@ try {
     }
 }
 if($samples.Count -ne ($Pairs*2)){throw 'Incomplete benchmark'}
-$report=Join-Path $testDir 'b13-mock-ab-results.csv'
+$report=Join-Path $testDir $ReportFileName
 $samples|Export-Csv -Path $report -Encoding UTF8 -NoTypeInformation
 foreach($name in @('baseline','optimized')){
     $values=@($samples |Where-Object version -eq $name|

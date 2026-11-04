@@ -20,6 +20,7 @@ dist-b13-perf/
 dist-b12-mita-candidate/
 benchmarks/fixtures/*-codec-benchmark.exe
 benchmarks/fixtures/*-codec-benchmark.obj
+benchmarks/fixtures/fast-array-*-benchmark.exe
 benchmarks/fixtures/_bench_build_baseline.cmd
 dist-b10-release/
 dist-b9-ats-baseline-test/
