@@ -16,6 +16,9 @@ dist-b9-release/
 dist-b11-options/
 dist-b11-input-display/
 dist-b11-release/
+dist-b12-mita-candidate/
+benchmarks/b12-mita-test-*/
+benchmarks/b12-negative-*/
 dist-b10-release/
 dist-b9-ats-baseline-test/
 dist-b9-ats-input-test/
