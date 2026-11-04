@@ -28,6 +28,20 @@ installer, updater manifest, and public download files are unchanged.
   original assets, and an independent VehiclePluginUsing.xml pointing to the
   original BveEX DLLs. The compatibility mode keeps its previous
   staging approach.
+- The Windows Application log for Nov 3 (21:30) and Nov 4 (20:25)
+  identifies `System.AccessViolationException` in
+  `SlimDX.Direct3D9.Font.MeasureString`, with the caller
+  `BveEx.Plugins.ExtractionHelper.PluginMain.Tick`. The faulting native
+  component is `d3dx9_43.dll`. The same stack occurred on two dates
+  before the development build was launched.
+- To isolate this problem, both normal and compatibility staging exclude
+  only `BveEx.Plugins.ExtractionHelper.dll` from the **temporary** BveEX
+  VehiclePluginUsing.xml when the scoped Mita/TKK3020 combination is used.
+  No original plugin is deleted or modified. Every other BveEX plugin is
+  retained. The temporary staging includes a diagnostic notice file.
+- ExtractionHelper includes controls labeled 東急, 地下鉄, 都交・埼玉,
+  相鉄. Disabling it can interfere with those controls and must **not**
+  be claimed as a universally compatible fix.
 - The generated run directory contains `三田線の音声調整.txt` describing the
   mapping and the uncertainty.
 
@@ -38,6 +52,9 @@ installer, updater manifest, and public download files are unchanged.
   configuration; temporary ATS channels 200-203 matched the existing
   original 204/205 resources, with valid WAV files.
 - Hashes of original scenario, vehicle and sound files stayed unchanged.
+- The original VehiclePluginUsing.xml remains intact; tested all four
+  staged copies exclude only ExtractionHelper while retaining every other
+  registered BveEX module.
 - Sotetsu route with TKK3020 vehicle kept the original vehicle path.
 - B9 other-vehicle selection, B6 route candidate choice and PanelViewEX
   diagnostic regression checks passed against the candidate build.
@@ -49,4 +66,6 @@ installer, updater manifest, and public download files are unchanged.
 - This remaps **vehicle-side passenger-promotion sound**, NOT the
   route's distinct station-specific platform melodies.
 - A separate exit-time BVE NullReferenceException has not been fixed.
+- The repeated in-game AccessViolationException in ExtractionHelper has
+  a scoped staging workaround, not an in-game success confirmation.
 - Do not attempt in-process key injection or disturb a running BVE game.

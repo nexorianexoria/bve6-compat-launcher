@@ -59,8 +59,27 @@ try{
                     throw ('Unexpected audio channel '+$entry.Key+' in '+$kind)
                 }
             }
-            if(!(Test-Path (Join-Path (Split-Path $shVehicle) 'VehiclePluginUsing.xml'))){
+            $temporaryPluginMap=Join-Path (Split-Path $shVehicle) 'VehiclePluginUsing.xml'
+            if(!(Test-Path $temporaryPluginMap)){
                 throw ('BveEX configuration missing '+$kind)
+            }
+            [xml]$originalPluginConfig=Get-Content (Join-Path $originalDir 'TKK3020/VehiclePluginUsing.xml') -Raw -Encoding UTF8
+            [xml]$temporaryPluginConfig=Get-Content $temporaryPluginMap -Raw -Encoding UTF8
+            $originalPluginNames=@($originalPluginConfig.BveExPluginUsing.Assembly |
+                ForEach-Object {[IO.Path]::GetFileName(($_.Path -replace '\\','/'))})
+            $temporaryPluginNames=@($temporaryPluginConfig.BveExPluginUsing.Assembly |
+                ForEach-Object {[IO.Path]::GetFileName(($_.Path -replace '\\','/'))})
+            $crashPlugin='BveEx.Plugins.ExtractionHelper.dll'
+            if($originalPluginNames -notcontains $crashPlugin -or
+                $temporaryPluginNames -contains $crashPlugin){
+                throw ('Crash-prone BveEX overlay is not properly isolated '+$kind)
+            }
+            $expectedPlugins=@($originalPluginNames | Where-Object {$_ -ne $crashPlugin})
+            if(@(Compare-Object $expectedPlugins $temporaryPluginNames).Count -ne 0){
+                throw ('Other BveEX vehicle plug-ins were lost '+$kind)
+            }
+            if(!(Test-Path (Join-Path (Split-Path $shVehicle) 'BveEXクラッシュ回避.txt'))){
+                throw ('Temporary crash workaround notice missing '+$kind)
             }
             $origSoundLines=[IO.File]::ReadAllText($sound,[Text.Encoding]::UTF8)
             if(!$origSoundLines.Contains('200 = Sound\Train Railway Next\NewB_L.wav')){

@@ -48,9 +48,38 @@ internal static class MitaMelodyOverride {
                 if(!String.IsNullOrWhiteSpace(attribute.Value))
                     attribute.Value=Program.Full(dir,attribute.Value);
             }
+            RemoveUnstableOverlay(xml,run);
             xml.Save(Path.Combine(run,file));
         }
         return staged;
+    }
+    internal static bool RemoveUnstableOverlay(XDocument xml,string run){
+        // The actual .NET Runtime crash stack (2026-11-03 and 2026-11-04)
+        // identifies BveEx.Plugins.ExtractionHelper.PluginMain.Tick as
+        // the caller of SlimDX Direct3D9.Font.MeasureString. Exclude ONLY
+        // this module from the temporary BveEX manifest in the scoped
+        // TKK3020-on-Mita diagnostic build. Its original DLL/config
+        // remain completely untouched.
+        var matching=xml.Descendants().Where(x=>
+            x.Name.LocalName=="Assembly" &&
+            x.Attribute("Path")!=null &&
+            Path.GetFileName(x.Attribute("Path").Value)
+              .Equals("BveEx.Plugins.ExtractionHelper.dll",StringComparison.OrdinalIgnoreCase)
+        ).ToList();
+        foreach(var element in matching)element.Remove();
+        if(matching.Count>0){
+            File.WriteAllText(Path.Combine(run,"BveEXクラッシュ回避.txt"),
+                "Windowsエラーログから、ExtractionHelperのTick内でSlimDXの"+
+                "文字描画処理がメモリアクセス違反を起こしたことが確認されました。"+
+                Environment.NewLine+
+                "この起動用コピーだけでExtractionHelperを除外しています。"+
+                "東急・地下鉄・都交／埼玉・相鉄の切替補助キーなど、この"+
+                "プラグインの機能が使えなくなる可能性があります。"+
+                Environment.NewLine+
+                "問題の解消は実機で未検証です。元のデータは変更していません。",
+                new UTF8Encoding(false));
+        }
+        return matching.Count>0;
     }
     internal static string StageSound(string original,string run,List<string> warnings){
         string[] lines=Program.Read(original);
