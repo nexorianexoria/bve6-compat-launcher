@@ -60,3 +60,10 @@ The exact **BVE-owned** DirectSound buffer configuration has now been
 identified. There is still **no demonstrated safe launcher-side fix**
 for all background audio, so the requested audio checkbox cannot yet be
 enabled truthfully.
+
+## Follow-up synthetic test
+
+See `B13_AUDIO_FOCUS_SYNTHETIC_TEST_20261107.md` for a subsequent isolated
+test using the actual installed BVE5 (x86) and BVE6 (x64) SlimDX runtimes.
+Both accept and report the GlobalFocus flag on their sound buffers.
+This does not verify audible BVE gameplay audio while unfocused.

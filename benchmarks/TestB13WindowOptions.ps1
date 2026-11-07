@@ -68,7 +68,14 @@ try{
     if($a -isnot [Windows.Forms.CheckBox] -or $b -isnot [Windows.Forms.CheckBox]){
         throw 'Both window options must be checkboxes'
     }
-    if($a.Checked -or $b.Checked){throw 'New options must default to off'}
+    # The UI must honor an existing user's topmost preference. An isolated
+    # empty-config check above verifies the actual default is off. Never
+    # overwrite or assume the state of the user's live preference file.
+    $readLive=$owner.GetMethod('Read',$flags)
+    $current=$readLive.Invoke($null,[object[]]@(6))
+    $savedTopmost=[bool]$settingsType.GetField('AlwaysOnTop',$flags).GetValue($current)
+    if($a.Checked -ne $savedTopmost){throw 'The UI did not load the saved topmost preference'}
+    if($b.Checked){throw 'The unimplemented audio option must be unchecked'}
     if($b.Enabled){throw 'Unverified background audio must not be enabled'}
     if(!$a.Text.Contains('最前面') -or !$b.Text.Contains('音声')){
         throw 'Checkbox descriptions are missing'
