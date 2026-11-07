@@ -109,6 +109,7 @@ internal static class BveLaunchDisplay {
 
     internal static void ArrangeWhenReady(int pid,int version) {
         ArrangeWhenReady(pid,version,Read(version));
+        BveWindowOptions.ArrangeWhenReady(pid,version);
     }
     // A caller-specified display is useful for isolated integration tests:
     // it does not save or alter the user's own monitor preference.

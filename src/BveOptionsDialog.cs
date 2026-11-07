@@ -11,6 +11,7 @@ internal sealed class BveOptionsDialog : Form {
     private readonly ComboBox versionChoice=new ComboBox();
     private readonly ComboBox screenChoice=new ComboBox();
     private readonly CheckBox windowed=new CheckBox();
+    private readonly CheckBox alwaysTop=new CheckBox(),backgroundAudio=new CheckBox();
     private readonly NumericUpDown width=new NumericUpDown(),height=new NumericUpDown();
     private readonly NumericUpDown front=new NumericUpDown(),back=new NumericUpDown(),filter=new NumericUpDown();
     private readonly CheckedListBox plugins=new CheckedListBox();
@@ -118,10 +119,17 @@ internal sealed class BveOptionsDialog : Form {
         Add(panel,1,"ウィンドウサイズ",size);
         screenChoice.DropDownStyle=ComboBoxStyle.DropDownList;
         Add(panel,2,"起動するモニター",screenChoice);
-        var note=new Label{Text="Windowsに登録されたモニター名・解像度・リフレッシュレート（Hz）を表示します。\nHzはモニターの更新頻度です。BVEの実測FPSではありません。\nモニター指定はウィンドウ表示のみ対応しています。",
+        alwaysTop.Text="BVEの運転画面を最前面に固定";
+        alwaysTop.AutoSize=true;
+        Add(panel,3,"最前面表示",alwaysTop);
+        backgroundAudio.Text="別ウィンドウ操作中も音声を維持（現在未対応）";
+        backgroundAudio.AutoSize=true;
+        backgroundAudio.Enabled=false;
+        Add(panel,4,"バックグラウンド音声",backgroundAudio);
+        var note=new Label{Text="最前面固定はウィンドウ表示でのみ有効です。ほかのアプリをクリックしてもBVEに入力フォーカスは戻しません。\nバックグラウンド音声はBVE本体・ATSの制御方法が未確認のため、現在は有効化できません。",
             Dock=DockStyle.Fill,ForeColor=Color.FromArgb(100,115,135),TextAlign=ContentAlignment.MiddleLeft};
-        Add(panel,3,"",note,104);
-        windowed.CheckedChanged+=(s,e)=>{screenChoice.Enabled=windowed.Checked;};
+        Add(panel,5,"",note,110);
+        windowed.CheckedChanged+=(s,e)=>{screenChoice.Enabled=windowed.Checked;alwaysTop.Enabled=windowed.Checked;};
         return Page("画面",panel);
     }
     private TabPage PerformancePage(){
@@ -237,7 +245,10 @@ internal sealed class BveOptionsDialog : Form {
         try{
             int version=versionChoice.SelectedIndex==0?6:5;
             current=BvePreferencesService.Read(version);
+            var launcherWindow=BveWindowOptions.Read(version);
             windowed.Checked=current.Windowed;
+            alwaysTop.Checked=launcherWindow.AlwaysOnTop;
+            backgroundAudio.Checked=false;
             width.Value=Math.Min(width.Maximum,Math.Max(width.Minimum,current.Width));
             height.Value=Math.Min(height.Maximum,Math.Max(height.Minimum,current.Height));
             front.Value=Math.Min(front.Maximum,Math.Max(front.Minimum,current.DrawDistance));
@@ -256,6 +267,7 @@ internal sealed class BveOptionsDialog : Form {
             }
             screenChoice.SelectedIndex=selected;
             screenChoice.Enabled=windowed.Checked;
+            alwaysTop.Enabled=windowed.Checked;
             plugins.Items.Clear();
             string executable=version==6?bve6:bve5;
             foreach(string plugin in BvePreferencesService.DiscoverPlugins(executable,current.InputPlugins))
@@ -300,6 +312,10 @@ internal sealed class BveOptionsDialog : Form {
                 NumerousControllerSettings.SaveAll(
                     NumerousControllerSettings.PathOnDisk,controllerItems,profileItems);
             BveLaunchDisplay.Save(version,target);
+            BveWindowOptions.Save(version,new BveWindowOptions.Settings{
+                AlwaysOnTop=updated.Windowed && alwaysTop.Checked,
+                BackgroundAudio=false
+            });
             MessageBox.Show(this,"設定を保存しました。次のBVE起動で反映されます。"+
                 "\nBVEの設定ファイルはバックアップ済みです。","設定を保存",
                 MessageBoxButtons.OK,MessageBoxIcon.Information);
