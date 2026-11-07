@@ -15,6 +15,10 @@ internal static class UpdateHistory {
     }
 
     internal static readonly Entry[] Published={
+        new Entry("0.29b13","2026/11/07",
+            "BVE運転画面の最前面固定を追加しました（ウィンドウ表示のみ、初期設定はオフ）。\r\n"+
+            "路線・車両の一覧表示用パネル画像処理と32ビットATS互換ブリッジを軽量化しました。\r\n"+
+            "バックグラウンド音声の切り替えは未対応です。"),
         new Entry("0.29b11","2026/11/04",
             "BVE起動前に画面サイズ・起動モニター・描画負荷と追加入力デバイスを設定可能に。\r\n"+
             "Windows登録のモニター名・解像度・Hzを表示し、NumerousControllerInterfaceのプロパティー設定に対応。"),

@@ -36,3 +36,4 @@ src/bridge/**/x64/
 *.lib
 *.obj
 oneclick-scenario.local.txt
+dist-b13-release/

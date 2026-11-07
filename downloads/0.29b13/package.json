@@ -1,0 +1,7 @@
+{
+    "version":  "0.2.9.24",
+    "displayVersion":  "0.29b13",
+    "url":  "https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29b13/BVE6Launcher-package.zip",
+    "sha256":  "CD227CE3643DA27033630417BBDCC93CDB666143A2BEE984B2B069F05594C226",
+    "notes":  "0.29b13：BVE運転画面の最前面固定を追加。車両一覧のパネル画像処理と32ビットATS互換処理を軽量化しました。バックグラウンド音声は未対応です。"
+}

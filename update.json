@@ -1,7 +1,7 @@
 {
-    "version":  "0.2.9.22",
-    "displayVersion":  "0.29b11",
-    "url":  "https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29b11/BVE6Launcher-package.zip",
-    "sha256":  "099B8E27681DB6B88BF30D702B3E0C628C45291C9D19A5B55FEDEBBE6DD6B3F4",
-    "notes":  "0.29b11：BVE起動前の画面サイズ・モニター・描画負荷・追加入力デバイスの設定を追加。Windows登録のモニター名・解像度・Hz表示、マスコンのプロパティー操作を改善しました。"
+    "version":  "0.2.9.24",
+    "displayVersion":  "0.29b13",
+    "url":  "https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29b13/BVE6Launcher-package.zip",
+    "sha256":  "CD227CE3643DA27033630417BBDCC93CDB666143A2BEE984B2B069F05594C226",
+    "notes":  "0.29b13：BVE運転画面の最前面固定を追加。車両一覧のパネル画像処理と32ビットATS互換処理を軽量化しました。バックグラウンド音声は未対応です。"
 }

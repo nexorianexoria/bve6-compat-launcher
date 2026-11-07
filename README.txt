@@ -1,4 +1,4 @@
-BVE5 Vehicle Compatibility for BVE6 — Ver.0.29b11
+BVE5 Vehicle Compatibility for BVE6 — Ver.0.29b13
 BVE6互換ランチャー（非公式ツール）
 
 ■ 導入方法

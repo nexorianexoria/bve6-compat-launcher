@@ -1,7 +1,10 @@
-﻿$ErrorActionPreference='Stop'
+﻿param([string]$LauncherPath='')
+$ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms
 $root=if($PSScriptRoot){Split-Path -Parent $PSScriptRoot}else{(Get-Location).Path}
-$exe=Join-Path $root 'dist-b13-perf/window-options-ui/BVE6互換ランチャー.exe'
+$exe=if([string]::IsNullOrWhiteSpace($LauncherPath)){
+    Join-Path $root 'dist-b13-perf/window-options-ui/BVE6互換ランチャー.exe'
+}else{[IO.Path]::GetFullPath($LauncherPath)}
 if(!(Test-Path -LiteralPath $exe)){throw 'B13 window-options UI build missing'}
 $assembly=[Reflection.Assembly]::LoadFrom($exe)
 $flags=[Reflection.BindingFlags]'Instance,Static,Public,NonPublic'
