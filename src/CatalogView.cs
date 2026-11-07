@@ -5,6 +5,7 @@ using System.Drawing;
 using System.Collections.Generic;
 using System.Windows.Forms;
 using System.Threading.Tasks;
+using System.Collections.Concurrent;
 
 internal sealed class CatalogItem {
  public Program.Entry Entry; public string Title,Group,Folder,Author,ImagePath,SupportHint,DataHint;
@@ -22,6 +23,9 @@ internal static class CatalogData {
   // Preserve item order and final sort semantics with one result slot per input entry.
   var source=entries.ToArray();
   var result=new CatalogItem[source.Length];
+  // Per-build cache only: vehicle variants frequently share a large panel
+  // definition. Never keep preview data after the scan so updates are visible.
+  var panelCache=vehicle?new ConcurrentDictionary<string,Lazy<string>>(StringComparer.OrdinalIgnoreCase):null;
   string prefix=Path.GetFullPath(root).TrimEnd('\\')+"\\";
   var options=new ParallelOptions{MaxDegreeOfParallelism=maxWorkers>0?maxWorkers:(vehicle?3:2),CancellationToken=token};
   Parallel.For(0,source.Length,options,
@@ -43,7 +47,7 @@ internal static class CatalogData {
       string specified=Program.Value(lines,"Vehicle");
       item.SupportHint=ScenarioChoices.IsRandom(specified)?"車両をランダム選択":CompatibilityHint.ForVehicle(Program.DefaultVehicle(entry.Path,lines));
      }else item.SupportHint=CompatibilityHint.ForVehicle(entry.Path,lines);
-     item.ImagePath=Previews.Resolve(entry.Path,vehicle,lines);
+     item.ImagePath=Previews.Resolve(entry.Path,vehicle,lines,panelCache);
     }catch(Exception ex){Diagnostics.Write("CATALOG_METADATA",entry.Path+" : "+ex.Message);item.SupportHint="形式を判定できません";}
     try{item.DataHint=hints.Describe(entry.Path,item.Title,vehicle,item.SupportHint,lines);}
     catch(Exception ex){Diagnostics.Write("DATA_HINT",entry.Path+" : "+ex.Message);item.DataHint=DataVersionHint.Quick(entry.Path,vehicle,item.SupportHint);}
