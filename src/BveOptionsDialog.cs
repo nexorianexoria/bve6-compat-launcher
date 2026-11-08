@@ -122,11 +122,11 @@ internal sealed class BveOptionsDialog : Form {
         alwaysTop.Text="BVEの運転画面を最前面に固定";
         alwaysTop.AutoSize=true;
         Add(panel,3,"最前面表示",alwaysTop);
-        backgroundAudio.Text="別ウィンドウ操作中も音声を維持（現在未対応）";
+        backgroundAudio.Text="別ウィンドウ操作中も音声を維持（DSOAL・試験機能）";
         backgroundAudio.AutoSize=true;
         backgroundAudio.Enabled=false;
         Add(panel,4,"バックグラウンド音声",backgroundAudio);
-        var note=new Label{Text="最前面固定はウィンドウ表示でのみ有効です。ほかのアプリをクリックしてもBVEに入力フォーカスは戻しません。\nバックグラウンド音声はBVE本体・ATSの制御方法が未確認のため、現在は有効化できません。",
+        var note=new Label{Text="最前面固定はウィンドウ表示でのみ有効です。ほかのアプリをクリックしてもBVEに入力フォーカスは戻しません。\nバックグラウンド音声はBVE本体のコピーと検証済みDSOALを使用する試験機能です。DSOALがない場合は選べません。BVE6で一例確認、BVE5・各プラグインの動作は未確認です。",
             Dock=DockStyle.Fill,ForeColor=Color.FromArgb(100,115,135),TextAlign=ContentAlignment.MiddleLeft};
         Add(panel,5,"",note,110);
         windowed.CheckedChanged+=(s,e)=>{screenChoice.Enabled=windowed.Checked;alwaysTop.Enabled=windowed.Checked;};
@@ -248,7 +248,8 @@ internal sealed class BveOptionsDialog : Form {
             var launcherWindow=BveWindowOptions.Read(version);
             windowed.Checked=current.Windowed;
             alwaysTop.Checked=launcherWindow.AlwaysOnTop;
-            backgroundAudio.Checked=false;
+            backgroundAudio.Checked=launcherWindow.BackgroundAudio;
+            backgroundAudio.Enabled=BveBackgroundAudio.HasTrustedRuntime(version);
             width.Value=Math.Min(width.Maximum,Math.Max(width.Minimum,current.Width));
             height.Value=Math.Min(height.Maximum,Math.Max(height.Minimum,current.Height));
             front.Value=Math.Min(front.Maximum,Math.Max(front.Minimum,current.DrawDistance));
@@ -314,7 +315,7 @@ internal sealed class BveOptionsDialog : Form {
             BveLaunchDisplay.Save(version,target);
             BveWindowOptions.Save(version,new BveWindowOptions.Settings{
                 AlwaysOnTop=updated.Windowed && alwaysTop.Checked,
-                BackgroundAudio=false
+                BackgroundAudio=backgroundAudio.Enabled && backgroundAudio.Checked
             });
             MessageBox.Show(this,"設定を保存しました。次のBVE起動で反映されます。"+
                 "\nBVEの設定ファイルはバックアップ済みです。","設定を保存",
