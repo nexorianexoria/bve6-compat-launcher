@@ -11,6 +11,8 @@ using System.Text.RegularExpressions;
 // user opts in, launch a temporary identical local copy with DSOAL beside it.
 // BVE5 and compatibility with all ATS / BveEX combinations remain unverified.
 internal static class BveBackgroundAudio {
+    private const string SandboxMarkerFile="background-audio-sandbox.marker";
+    private const string SandboxMarkerContent="BVE_BACKGROUND_AUDIO_TEST_COPY_V1";
     private static readonly Dictionary<string,string> TrustedDlls=
         new Dictionary<string,string>(StringComparer.OrdinalIgnoreCase) {
             {"Win32/dsound.dll","105BC75B63B12E7CB30BE51EE5CA450D98C3E89014F47372889F8C8D1BC5DF2C"},
@@ -29,6 +31,29 @@ internal static class BveBackgroundAudio {
         using(var sha=SHA256.Create())
         using(var file=File.OpenRead(path))
             return BitConverter.ToString(sha.ComputeHash(file)).Replace("-","");
+    }
+
+    // Do not follow junctions / symlinks from a vendor installation. In
+    // particular, SearchOption.AllDirectories could cross a directory link.
+    private static IEnumerable<FileInfo> SafeFiles(DirectoryInfo root) {
+        var folders=new Stack<DirectoryInfo>();
+        folders.Push(root);
+        while(folders.Count>0) {
+            var current=folders.Pop();
+            if((current.Attributes & FileAttributes.ReparsePoint)!=0)
+                throw new InvalidDataException("リンクされたフォルダーは複製しません。");
+            foreach(var subdirectory in current.GetDirectories()){
+                if((subdirectory.Attributes & FileAttributes.ReparsePoint)!=0)
+                    throw new InvalidDataException(
+                        "BVE本体内のリンクされたフォルダーは複製できません。");
+                folders.Push(subdirectory);
+            }
+            foreach(var file in current.GetFiles()){
+                if((file.Attributes & FileAttributes.ReparsePoint)!=0)
+                    throw new InvalidDataException("リンクされたファイルは複製できません。");
+                yield return file;
+            }
+        }
     }
 
     internal static bool HasTrustedRuntime(int version) {
@@ -79,9 +104,7 @@ internal static class BveBackgroundAudio {
         Directory.CreateDirectory(sandbox);
         try {
             var root=new DirectoryInfo(source);
-            foreach(var file in root.GetFiles("*",SearchOption.AllDirectories)) {
-                if((file.Attributes & FileAttributes.ReparsePoint)!=0)
-                    throw new InvalidDataException("リンクされたファイルは試験環境へコピーできません。");
+            foreach(var file in SafeFiles(root)) {
                 string relative=file.FullName.Substring(prefix.Length);
                 string dest=Path.Combine(sandbox,relative);
                 Directory.CreateDirectory(Path.GetDirectoryName(dest));
@@ -99,6 +122,8 @@ internal static class BveBackgroundAudio {
                     StringComparison.OrdinalIgnoreCase))
                     throw new IOException("音声DLLのコピーが一致しません。");
             }
+            File.WriteAllText(Path.Combine(sandbox,SandboxMarkerFile),
+                SandboxMarkerContent);
             return copy;
         }catch{
             try{Directory.Delete(sandbox,true);}catch(IOException){}
@@ -155,9 +180,20 @@ internal static class BveBackgroundAudio {
             if(!Regex.IsMatch(folder.Name,@"^BVE[56]-[a-f0-9]{32}$",
                     RegexOptions.CultureInvariant))continue;
             if((folder.Attributes & FileAttributes.ReparsePoint)!=0)continue;
-            try{folder.Delete(true);}
+            try{
+                string marker=Path.Combine(folder.FullName,SandboxMarkerFile);
+                if(!File.Exists(marker) ||
+                   File.ReadAllText(marker)!=SandboxMarkerContent)continue;
+                // A renamed or tampered folder may contain links; never
+                // traverse through those during recursive deletion.
+                foreach(var file in SafeFiles(folder)){ /* validate only */ }
+                folder.Delete(true);
+            }
             catch(IOException ex){Diagnostics.Write("BVE_AUDIO_TEST_CLEANUP",ex.Message);}
             catch(UnauthorizedAccessException ex){
+                Diagnostics.Write("BVE_AUDIO_TEST_CLEANUP",ex.Message);
+            }
+            catch(InvalidDataException ex){
                 Diagnostics.Write("BVE_AUDIO_TEST_CLEANUP",ex.Message);
             }
         }

@@ -2,9 +2,17 @@
     [ValidateSet(5,6)][int]$Version=6,
     [string]$Scenario='',
     [ValidateRange(5,120)][int]$ObserveSeconds=22,
-    [switch]$UseLauncherCore
+    [switch]$UseLauncherCore,
+    [switch]$UseCompatPrep
 )
 $ErrorActionPreference='Stop'
+$previewAssembly=$null
+$programHome=$null
+$programData=$null
+$savedHome=$null
+$savedData=$null
+$ready=$null
+$compatLog=$null
 $root=Split-Path -Parent $PSScriptRoot
 $sandbox=Join-Path $root ('dist-b13-perf/audio-focus-sandbox/BVE'+$Version)
 $exe=Join-Path $sandbox 'BveTs.exe'
@@ -23,6 +31,9 @@ foreach($f in $files){
 }
 if(@(Get-Process -Name BveTs -ErrorAction SilentlyContinue).Count -gt 0){
     throw 'A BVE process is already running. Refusing to start another.'
+}
+if($UseCompatPrep -and (!$UseLauncherCore -or $Version -ne 6)){
+    throw 'The isolated 32-bit ATS bridge test requires BVE6 and -UseLauncherCore'
 }
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'TestB13BackgroundAudioSandbox.ps1') | Out-Host
 if($LASTEXITCODE -ne 0){throw 'Sandbox verification failed'}
@@ -50,9 +61,44 @@ try {
         $audioRoot=Join-Path $root 'dist-b13-perf/audio-preview/audio'
         $runs=Join-Path $root 'benchmarks/results/b13-live-launcher-runs'
         if(!(Test-Path $launcher)){throw 'Audio-enabled prototype launcher is missing'}
-        $assembly=[Reflection.Assembly]::LoadFrom($launcher)
-        $type=$assembly.GetType('BveBackgroundAudio',$true)
+        $previewAssembly=[Reflection.Assembly]::LoadFrom($launcher)
         $flags=[Reflection.BindingFlags]'NonPublic,Public,Static'
+        if($UseCompatPrep){
+            $program=$previewAssembly.GetType('Program',$true)
+            $programHome=$program.GetField('Home',$flags)
+            $programData=$program.GetField('Data',$flags)
+            $savedHome=[string]$programHome.GetValue($null)
+            $savedData=[string]$programData.GetValue($null)
+            $programHome.SetValue($null,([IO.Path]::GetDirectoryName($launcher)+[IO.Path]::DirectorySeparatorChar))
+            $workData=Join-Path $root 'benchmarks/results/b13-live-ats-prep'
+            $programData.SetValue($null,[string]$workData)
+            $prepare=$program.GetMethod('Prepare',$flags,$null,
+                [Type[]]@([string],[string],[string]),$null)
+            $prepareArgs=New-Object 'object[]' 3
+            $prepareArgs[0]=[string]$Scenario
+            $prepareArgs[1]=$null
+            $prepareArgs[2]=$null
+            $ready=$prepare.Invoke($null,$prepareArgs)
+            $readyType=$ready.GetType()
+            $mode=[string]$readyType.GetField('Mode').GetValue($ready)
+            $compatLog=[string]$readyType.GetField('Log').GetValue($ready)
+            Write-Output ('PREPARE_MODE='+$mode)
+            Write-Output ('PREPARE_ATS='+$readyType.GetField('Ats').GetValue($ready))
+            Write-Output ('PREPARE_BRIDGE_LOG='+$compatLog)
+            if(!$mode.StartsWith('32bit',[StringComparison]::OrdinalIgnoreCase)){
+                throw 'The selected scenario did not use the 32-bit ATS compatibility bridge'
+            }
+            $preparedScenario=[string]$readyType.GetField('Scenario').GetValue($ready)
+            Write-Output ('PREPARED_SCENARIO='+$preparedScenario)
+            $preparedWarnings=$readyType.GetField('Warnings').GetValue($ready)
+            Write-Output ('PREPARE_WARNING_COUNT='+@($preparedWarnings).Count)
+            $info.Arguments='"'+$preparedScenario+'"'
+            $info.EnvironmentVariables['BVE5COMPAT_ATS']=[string]$readyType.GetField('Ats').GetValue($ready)
+            $info.EnvironmentVariables['BVE5COMPAT_LOG']=$compatLog
+            $info.EnvironmentVariables['BVE5COMPAT_WORKDIR']=[string]$readyType.GetField('Work').GetValue($ready)
+            $info.EnvironmentVariables['BVE5COMPAT_PROFILE']='0'
+        }
+        $type=$previewAssembly.GetType('BveBackgroundAudio',$true)
         $startCore=$type.GetMethod('StartCore',$flags)
         $arguments=New-Object 'object[]' 5
         $arguments[0]=[Diagnostics.ProcessStartInfo]$info.PSObject.BaseObject
@@ -74,18 +120,24 @@ try {
     Write-Output ('TEST_SCENARIO='+$Scenario)
     $loadedSound=$false
     $loadedAl=$false
+    $probeArch=if($Version -eq 5){'x86'}else{'x64'}
+    $moduleProbe=Join-Path $root ('benchmarks/results/B13BveModulesReadOnly-'+$probeArch+'.exe')
+    if(!(Test-Path -LiteralPath $moduleProbe)){
+        throw 'Read-only process-module helper is missing'
+    }
+    $lastModuleSummary=@()
     for($i=0;$i -lt 20;$i++){
         Start-Sleep -Seconds 1
         $process.Refresh()
         if($process.HasExited){break}
         try {
-            $modules=@($process.Modules | ForEach-Object {$_.FileName})
-            $loadedSound=@($modules|Where-Object {
-                $_.Equals((Join-Path $sandbox 'dsound.dll'),[StringComparison]::OrdinalIgnoreCase)
-            }).Count -gt 0
-            $loadedAl=@($modules|Where-Object {
-                $_.Equals((Join-Path $sandbox 'dsoal-aldrv.dll'),[StringComparison]::OrdinalIgnoreCase)
-            }).Count -gt 0
+            $lastModuleSummary=@(& $moduleProbe ([string]$process.Id))
+            if($LASTEXITCODE -ne 0){throw 'Module helper returned failure'}
+            $joined=$lastModuleSummary -join [Environment]::NewLine
+            $loadedSound=$joined.IndexOf(('PATH='+[IO.Path]::Combine($sandbox,'dsound.dll')),
+                [StringComparison]::OrdinalIgnoreCase) -ge 0
+            $loadedAl=$joined.IndexOf(('PATH='+[IO.Path]::Combine($sandbox,'dsoal-aldrv.dll')),
+                [StringComparison]::OrdinalIgnoreCase) -ge 0
             if($loadedSound -and $loadedAl){break}
         }catch{Write-Output ('MODULE_QUERY_WARNING='+$_.Exception.Message)}
     }
@@ -95,6 +147,7 @@ try {
     }else{
         Write-Output ('DSOAL_DSOUND_LOADED='+$loadedSound)
         Write-Output ('DSOAL_OPENAL_LOADED='+$loadedAl)
+        $lastModuleSummary | Where-Object {$_ -match '^MODULE='} | Out-Host
         Write-Output 'AUDIO_METER_START'
         & $meter $process.Id $ObserveSeconds | Out-File -LiteralPath $observations -Encoding utf8
         if($LASTEXITCODE -ne 0){throw 'Audio meter failed'}
@@ -102,6 +155,11 @@ try {
             $_ -match '^(FOCUSED|UNFOCUSED|FOCUS_COMPARISON|AUDIO_RAW_RECORDING)='
         } | Out-Host
         Write-Output ('PEAK_RESULTS='+$observations)
+        if($UseCompatPrep){
+            Write-Output 'BRIDGE_PROCESS_STATUS:'
+            Get-Process -Name 'Bve5VehicleCompatibility' -ErrorAction SilentlyContinue |
+                Select-Object ProcessName,Id,Path | Out-Host
+        }
     }
 }finally{
     if($null -ne $process){
@@ -143,6 +201,14 @@ try {
         Write-Output ('DSOAL_LOG='+$log)
         Get-Content -LiteralPath $log -Tail 14 | Out-Host
     }
+    if($compatLog){
+        Write-Output ('BRIDGE_LOG_EXISTS='+(Test-Path -LiteralPath $compatLog))
+        if(Test-Path -LiteralPath $compatLog){
+            Get-Content -LiteralPath $compatLog -Encoding UTF8 -Tail 18 |Out-Host
+        }
+    }
+    if($programHome){$programHome.SetValue($null,$savedHome)}
+    if($programData){$programData.SetValue($null,$savedData)}
     if($null -ne $process -and $hasExited -and (Test-Path $settingsBackup)){
         Remove-Item -LiteralPath $settingsBackup -Force
     }

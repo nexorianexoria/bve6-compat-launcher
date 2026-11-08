@@ -89,3 +89,68 @@
 - 試験用コピーは次回のバックグラウンド音声起動時に、BVEが起動していないことを確認してから旧コピーのみ削除する。無関係のフォルダーを削除しない試験に合格した。
 - コード：`src/BveBackgroundAudio.cs`。BVE以外のウィンドウへの切り替え時の操作・画面やBveEX、PanelViewEX、TSHUD、32bit ATSとの互換性、起動終了時の安定性は広範囲には未検証。
 - **注意：** 実験的なオプションを含むローカル開発版のみ。正式公開版 `v0.29b13` と `main` ブランチは変更しない。
+
+## 2026-11-08 追加実機試験：BVE5 / ATS / PanelViewEX
+
+### BVE5 の DirectSound 読み込みを再検証
+
+- プロセスのビット数に合わせたモジュール確認プログラム
+  `benchmarks/B13BveModulesReadOnly.cs` を追加し、x86/x64 を個別にビルド。
+- `mackoy.Keisei.txt` をBVE5で試験。アプリケーションローカルの
+  **Win32 `dsound.dll` と `dsoal-aldrv.dll` が両方ロードされた**。
+- 非アクティブ時の音声セッション：131サンプル中106サンプルで非ゼロ、
+  最大ピーク `0.100869`。フォアグラウンドとの比較試験ではない。
+- 元のBVE5実行ファイル、ユーザー設定ファイルの不変を確認。
+- **ユーザーによるBVE5での聴感確認は未実施**。
+
+### PanelViewEX / BveEX の共存
+
+- BVE6 `_BveExSamples.Basic.Panel.txt`：DSOAL二つのDLL、
+  `BveEx.DummyAts.x64.dll`、`PanelView.Native.dll` (x64) を読み込み。
+  可視ウィンドウ `PanelViewEX 1.01` と `BVE Trainsim 6` を確認（PID 30584）。
+- BVE5 同シナリオ：DSOAL二つのDLL、
+  `BveEx.DummyAts.x86.dll`、`PanelView.Native.dll` (x86) を読み込み。
+  可視ウィンドウ `PanelViewEX 1.01` と `Bve trainsim 5` を確認（PID 7604）。
+- このサンプルの音声セッションはピーク0。無音のため音声維持試験の根拠には使わない。
+- BVE6 `mackoy.Keisei.txt`：`KqAts64.dll`、DSOAL、
+  PanelView Native (x64) とPanelViewEX 1.01 可視ウィンドウが共存（PID 29272）。
+  フォアグラウンド62サンプル（最大 `0.706771`）、
+  非アクティブ282サンプル（最大 `0.846580`）で音声出力を検出。
+- 各DLLとウィンドウの読み込み・表示は確認したが、
+  **全操作・パネル更新・画質・FPS・長時間安定性は未検証**。
+
+### BVE6 と32ビットATS互換ブリッジの同時実行
+
+- シナリオ：`JRTozai2227B.txt`、車両の32ビット `tozai.dll`。
+- 実際のランチャーコード `Program.Prepare` で
+  `32bit ATSを橋渡し` モードを準備し、`BveBackgroundAudio.StartCore`
+  経由でDSOAL付きBVE6コピーを起動した。
+- `Bve5VehicleCompatibility.exe` の別プロセスを確認。
+  `bridge.log` に `host_elapse_frames=1294`,
+  `bridge_elapse_frames=1294`、`HOST_FINISHED` が記録されている。
+  エラー・例外等を示す文字列は検出されなかった。
+- フォアグラウンド34サンプル（最大 `0.055671`）、
+  非アクティブ169サンプル（最大 `0.135230`）で音声出力を検出。
+- 元のBVE6実行ファイル・設定は不変。BVE終了後、ATSブリッジも終了。
+- **ATS機器の正常な保安装置動作、警報発生時の挙動、走行中の安全性は未検証**。
+- 実行用スクリプト:
+  `benchmarks/TestB13LiveBveAudio.ps1 -Version 6 -UseLauncherCore -UseCompatPrep -Scenario <path> -ObserveSeconds 25`。
+
+### TsHud の状態と制限
+
+- `C:\Users\Public\Documents\BveEx\2.0\LoadedExtensions.xml` に
+  `TsHud.dll` `IsEnabled="true"` を確認。
+- `TsHud.dll` の実ファイルは存在し、ファイルバージョン `1.1.0.0`。
+- **TsHudの実際の画面描画、更新、操作は確認できていない**。
+  設定有効だけで「動作成功」とは判定しない。
+
+### コピーとロールバックの安全確認
+
+- 音声オンのときだけ、元BVEの全ファイルを別ディレクトリへ複製。
+  本体配下のリンク先ディレクトリはたどらず、コピーを拒否する。
+- コピーはマーカーを持つ試験用フォルダーだけを次回のテスト開始時に整理し、
+  同名形式でもマーカーのないフォルダーは削除しない。
+- 上記の独立設定、DSOAL検証、音声オフ時の既存起動経路、
+  DLL欠落時の安全停止、マーカー付き旧試験フォルダーの削除を
+  `benchmarks/TestB13BackgroundAudioIntegration.ps1` で検証済み。
+- **一般公開はしない。現行正式公開版 `v0.29b13` に変更なし**。

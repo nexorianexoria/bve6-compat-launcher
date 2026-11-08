@@ -156,16 +156,21 @@ try{
     $cleanup=$audio.GetMethod('CleanupPreviousTestRuns',$flags)
     $cleanupRoot=Join-Path $scratch 'cleanup-test'
     $oldSandbox=Join-Path $cleanupRoot ('BVE6-'+[Guid]::NewGuid().ToString('N'))
+    $unmarkedSandbox=Join-Path $cleanupRoot ('BVE5-'+[Guid]::NewGuid().ToString('N'))
     $unrelated=Join-Path $cleanupRoot 'do-not-delete'
-    New-Item -ItemType Directory -Path $oldSandbox,$unrelated -Force | Out-Null
+    New-Item -ItemType Directory -Path $oldSandbox,$unmarkedSandbox,$unrelated -Force | Out-Null
     [IO.File]::WriteAllText((Join-Path $oldSandbox 'old-log.txt'),'old test data')
+    [IO.File]::WriteAllText((Join-Path $oldSandbox 'background-audio-sandbox.marker'),
+        'BVE_BACKGROUND_AUDIO_TEST_COPY_V1')
+    [IO.File]::WriteAllText((Join-Path $unmarkedSandbox 'protected.txt'),'retain')
     [IO.File]::WriteAllText((Join-Path $unrelated 'protected.txt'),'retain')
     [void]$cleanup.Invoke($null,[object[]]@([string]$cleanupRoot))
     if((Test-Path -LiteralPath $oldSandbox) -or
+        !(Test-Path -LiteralPath (Join-Path $unmarkedSandbox 'protected.txt')) -or
         !(Test-Path -LiteralPath (Join-Path $unrelated 'protected.txt'))){
         throw 'Audio-run cleanup removed an unrelated directory or retained stale staging'
     }
-    Write-Output 'STALE_TEST_COPY_CLEANUP_DOES_NOT_TOUCH_UNRELATED_FILES_PASS'
+    Write-Output 'ONLY_MARKED_STALE_TEST_COPIES_ARE_REMOVED_PASS'
     Write-Output 'BVE_BACKGROUNDAUDIO_INTEGRATION_SYNTHETIC_PASS'
 }finally{
     $homeField.SetValue($null,$originalHome)
