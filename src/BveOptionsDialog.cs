@@ -122,11 +122,11 @@ internal sealed class BveOptionsDialog : Form {
         alwaysTop.Text="BVEの運転画面を最前面に固定";
         alwaysTop.AutoSize=true;
         Add(panel,3,"最前面表示",alwaysTop);
-        backgroundAudio.Text="別ウィンドウ操作中も音声を維持（DSOAL・試験機能）";
+        backgroundAudio.Text="別ウィンドウ操作中も音声を維持（試験機能）";
         backgroundAudio.AutoSize=true;
         backgroundAudio.Enabled=false;
         Add(panel,4,"バックグラウンド音声",backgroundAudio);
-        var note=new Label{Text="最前面固定はウィンドウ表示でのみ有効です。ほかのアプリをクリックしてもBVEに入力フォーカスは戻しません。\nバックグラウンド音声はBVE本体のコピーと検証済みDSOALを使用する試験機能です。DSOALがない場合は選べません。BVE6で一例確認、BVE5・各プラグインの動作は未確認です。",
+        var note=new Label{Text="最前面固定はウィンドウ表示でのみ有効です。ほかのアプリをクリックしてもBVEに入力フォーカスは戻しません。\n音声維持は元のBVEを変更せず、コピーと同梱DSOALを使う試験機能です。BVE5・BVE6で確認していますが、すべてのATS・TsHud等の動作は未確認です。",
             Dock=DockStyle.Fill,ForeColor=Color.FromArgb(100,115,135),TextAlign=ContentAlignment.MiddleLeft};
         Add(panel,5,"",note,110);
         windowed.CheckedChanged+=(s,e)=>{screenChoice.Enabled=windowed.Checked;alwaysTop.Enabled=windowed.Checked;};

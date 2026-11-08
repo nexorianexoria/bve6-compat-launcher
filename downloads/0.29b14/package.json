@@ -1,0 +1,7 @@
+{
+    "version":  "0.2.9.25",
+    "displayVersion":  "0.29b14",
+    "url":  "https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29b14/BVE6Launcher-package.zip",
+    "sha256":  "3E2E813E3A1618F6FBC0B64B46F7C30997670FF919919304BCE5FA6AA88D201C",
+    "notes":  "0.29b14：バックグラウンド音声のオン・オフ設定を追加。BVE5・BVE6に対応し、BVE本体は変更しません。初期設定はオフです。"
+}

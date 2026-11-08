@@ -1,0 +1,3 @@
+208ec167808bcfc4a5a4668323fbfcd86063a6f77ddd4eaa6341cc0d0961d75f  downloads/0.29b14/BVE6Launcher-0.29b14-Portable.zip
+1d1a8374946c97732c2c0a6417d1e026acd0818d9970e9c6f452484a0786138b  downloads/0.29b14/BVE6Launcher-Setup.exe
+3e2e813e3a1618f6fbc0b64b46f7c30997670ff919919304bce5fa6aa88d201c  downloads/0.29b14/BVE6Launcher-package.zip

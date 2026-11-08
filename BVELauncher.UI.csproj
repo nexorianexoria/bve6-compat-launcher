@@ -36,6 +36,10 @@
     <Compile Include="src\*.cs" />
     <EmbeddedResource Include="terms.txt"><LogicalName>terms.txt</LogicalName></EmbeddedResource>
     <EmbeddedResource Include="launcher-icon.png"><LogicalName>launcher-icon.png</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="third_party\DSOAL\Win32\dsound.dll"><LogicalName>BVEAudio.Win32.dsound.dll</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="third_party\DSOAL\Win32\dsoal-aldrv.dll"><LogicalName>BVEAudio.Win32.dsoal-aldrv.dll</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="third_party\DSOAL\Win64\dsound.dll"><LogicalName>BVEAudio.Win64.dsound.dll</LogicalName></EmbeddedResource>
+    <EmbeddedResource Include="third_party\DSOAL\Win64\dsoal-aldrv.dll"><LogicalName>BVEAudio.Win64.dsoal-aldrv.dll</LogicalName></EmbeddedResource>
     <Content Include="launcher.ico"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></Content>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

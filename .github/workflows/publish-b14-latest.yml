@@ -1,0 +1,56 @@
+name: Publish v0.29b14 latest
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/publish-b14-latest.yml"
+      - "downloads/0.29b14/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: github.repository == 'nexorianexoria/bve6-compat-launcher' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release files
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate package hashes and release files
+        run: |
+          set -euo pipefail
+          test -s downloads/0.29b14/BVE6Launcher-0.29b14-Portable.zip
+          test -s downloads/0.29b14/BVE6Launcher-Setup.exe
+          test -s downloads/0.29b14/BVE6Launcher-package.zip
+          test -s downloads/0.29b14/SHA256SUMS.txt
+          sha256sum -c downloads/0.29b14/SHA256SUMS.txt
+          grep -q 'Ver.0.29b14' RELEASE_NOTES_0.29b14_PUBLIC.md
+          grep -q 'Ver.0.29b14' README.md
+          grep -q '0.2.9.25' update.json
+      - name: Publish b14 release and keep earlier versions
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh release view v0.29b14 >/dev/null 2>&1; then
+            gh release upload v0.29b14 \
+              downloads/0.29b14/BVE6Launcher-0.29b14-Portable.zip \
+              downloads/0.29b14/BVE6Launcher-Setup.exe --clobber
+            # Only the two user-facing downloads belong on the release page.
+            for extra in BVE6Launcher-0.29b14-Source.zip BVE6Launcher-package.zip SHA256SUMS.txt; do
+              gh release delete-asset v0.29b14 "$extra" --yes 2>/dev/null || true
+            done
+            gh release edit v0.29b14 --notes-file RELEASE_NOTES_0.29b14_PUBLIC.md --latest
+          else
+            gh release create v0.29b14 \
+              downloads/0.29b14/BVE6Launcher-0.29b14-Portable.zip \
+              downloads/0.29b14/BVE6Launcher-Setup.exe \
+              --target "$GITHUB_SHA" \
+              --title "Ver.0.29b14 — BVE6互換ランチャー" \
+              --notes-file RELEASE_NOTES_0.29b14_PUBLIC.md \
+              --latest
+          fi

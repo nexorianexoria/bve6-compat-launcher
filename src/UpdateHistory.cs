@@ -15,6 +15,10 @@ internal static class UpdateHistory {
     }
 
     internal static readonly Entry[] Published={
+        new Entry("0.29b14","2026/11/08",
+            "BVE5・BVE6で別ウィンドウ操作中も音声を維持するオプションを追加しました（初期設定はオフ）。\r\n"+
+            "元のBVE本体を変更せず、DSOALを検証用コピーに配置して起動します。\r\n"+
+            "一部の路線・ATS・TsHudについては動作未確認です。"),
         new Entry("0.29b13","2026/11/07",
             "BVE運転画面の最前面固定を追加しました（ウィンドウ表示のみ、初期設定はオフ）。\r\n"+
             "路線・車両の一覧表示用パネル画像処理と32ビットATS互換ブリッジを軽量化しました。\r\n"+

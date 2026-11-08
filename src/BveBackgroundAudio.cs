@@ -32,6 +32,32 @@ internal static class BveBackgroundAudio {
         using(var file=File.OpenRead(path))
             return BitConverter.ToString(sha.ComputeHash(file)).Replace("-","");
     }
+    private static string EmbeddedName(string arch,string file) {
+        return "BVEAudio."+arch+"."+file;
+    }
+    private static bool EmbeddedVerified(int version) {
+        string arch=Architecture(version);
+        foreach(string name in new[]{"dsound.dll","dsoal-aldrv.dll"}) {
+            using(Stream stream=typeof(BveBackgroundAudio).Assembly.
+                GetManifestResourceStream(EmbeddedName(arch,name))) {
+                if(stream==null)return false;
+                using(var sha=SHA256.Create()) {
+                    string actual=BitConverter.ToString(sha.ComputeHash(stream)).Replace("-","");
+                    if(!actual.Equals(TrustedDlls[arch+"/"+name],
+                        StringComparison.OrdinalIgnoreCase))return false;
+                }
+            }
+        }
+        return true;
+    }
+    private static void CopyEmbedded(string arch,string name,string target) {
+        using(Stream stream=typeof(BveBackgroundAudio).Assembly.
+            GetManifestResourceStream(EmbeddedName(arch,name))) {
+            if(stream==null)throw new FileNotFoundException(
+                "ランチャーに音声ライブラリが含まれていません。");
+            using(var output=File.Create(target)){stream.CopyTo(output);}
+        }
+    }
 
     // Do not follow junctions / symlinks from a vendor installation. In
     // particular, SearchOption.AllDirectories could cross a directory link.
@@ -57,9 +83,10 @@ internal static class BveBackgroundAudio {
     }
 
     internal static bool HasTrustedRuntime(int version) {
-        return HasTrustedRuntime(version,Path.Combine(Program.Home,"audio"));
+        return HasTrustedRuntime(version,null);
     }
     internal static bool HasTrustedRuntime(int version,string audioRoot) {
+        if(audioRoot==null)return EmbeddedVerified(version);
         string arch=Architecture(version);
         foreach(string name in new[]{"dsound.dll","dsoal-aldrv.dll"}) {
             string dll=Path.Combine(audioRoot,arch,name);
@@ -115,9 +142,9 @@ internal static class BveBackgroundAudio {
             if(!File.Exists(copy) || Hash(copy)!=originalHash)
                 throw new IOException("BVE本体のコピーが一致しません。");
             foreach(string name in new[]{"dsound.dll","dsoal-aldrv.dll"}) {
-                string dll=Path.Combine(audioRoot,arch,name);
                 string dest=Path.Combine(sandbox,name);
-                File.Copy(dll,dest,false);
+                if(audioRoot==null)CopyEmbedded(arch,name,dest);
+                else File.Copy(Path.Combine(audioRoot,arch,name),dest,false);
                 if(!Hash(dest).Equals(TrustedDlls[arch+"/"+name],
                     StringComparison.OrdinalIgnoreCase))
                     throw new IOException("音声DLLのコピーが一致しません。");
@@ -135,8 +162,7 @@ internal static class BveBackgroundAudio {
     // Only the game executable and its working directory change on opt-in.
     internal static Process Start(ProcessStartInfo start,int version) {
         bool enabled=BveWindowOptions.Read(version).BackgroundAudio;
-        return StartCore(start,version,enabled,
-            Path.Combine(Program.Home,"audio"),
+        return StartCore(start,version,enabled,null,
             Path.Combine(Program.Data,"background-audio-test"));
     }
 

@@ -1,0 +1,2 @@
+# Preserve upstream third-party license texts verbatim.
+third_party/DSOAL/Documentation/* -text whitespace=-blank-at-eol
