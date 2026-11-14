@@ -22,12 +22,15 @@ jobs:
         run: |
           set -euo pipefail
           test -s downloads/0.29b15/BVE6Launcher-0.29b15-Portable.zip
+          test -s downloads/0.29b15/BVE6Launcher-Setup.exe
+          test -s downloads/0.29b15/BVE6Launcher-package.zip
+          test -s downloads/0.29b15/package.json
           test -s RELEASE_NOTES_0.29b15_PREVIEW.md
           test -s SECURITY_REVIEW_0.29b15.md
           grep -q 'Trojan:Win32/Wacatac.H!ml' RELEASE_NOTES_0.29b15_PREVIEW.md
           grep -q '"displayVersion":  "0.29b14"' update.json
           python3 - <<'PY'
-          import hashlib, zipfile
+          import hashlib, zipfile, json
           path='downloads/0.29b15/BVE6Launcher-0.29b15-Portable.zip'
           expected='A8CF2DC93D6231D6B1D61480EF9B0ACA86F5715D9D4D66B32F2EF528ACFA6B82'
           with open(path,'rb') as f:
@@ -41,6 +44,26 @@ jobs:
               with z.open(exe[0]) as f:
                   digest=hashlib.sha256(f.read()).hexdigest().upper()
               assert digest=='C03DD2405CF7EF395D39FBD1D7BEB4D1313558D08297393516A4131EDB233D1D'
+          setup='downloads/0.29b15/BVE6Launcher-Setup.exe'
+          with open(setup,'rb') as f:
+              assert hashlib.file_digest(f,'sha256').hexdigest().upper()=='F3B9B823FD87C6965DBC5A48D5EE8F316EF18BBE9F5FBD0D433E5B8C9FE594F0'
+          package='downloads/0.29b15/BVE6Launcher-package.zip'
+          with open(package,'rb') as f:
+              assert hashlib.file_digest(f,'sha256').hexdigest().upper()=='091DD6C3EE867AA79281CDF7EB569E8A5C4A8D633B05399FFC457069D2F0C799'
+          with open('downloads/0.29b15/package.json',encoding='utf-8-sig') as f:
+              manifest=json.load(f)
+          assert manifest['version']=='0.2.9.26'
+          assert manifest['displayVersion']=='0.29b15'
+          assert manifest['sha256'].upper()=='091DD6C3EE867AA79281CDF7EB569E8A5C4A8D633B05399FFC457069D2F0C799'
+          with zipfile.ZipFile(package) as z:
+              entries=[i for i in z.infolist() if not i.is_dir()]
+              assert len(entries)==12
+              index=json.loads(z.read('package-index.json'))
+              assert index['version']=='0.2.9.26' and index['displayVersion']=='0.29b15'
+              for item in entries:
+                  if item.filename=='package-index.json':continue
+                  assert hashlib.sha256(z.read(item)).hexdigest().upper()==index['files'][item.filename].upper()
+              assert hashlib.sha256(z.read('BVE6互換ランチャー.exe')).hexdigest().upper()=='C03DD2405CF7EF395D39FBD1D7BEB4D1313558D08297393516A4131EDB233D1D'
           print('HASH_AND_STRUCTURE_PASS')
           PY
       - name: Publish b15 portable prerelease
@@ -49,11 +72,11 @@ jobs:
         run: |
           set -euo pipefail
           if gh release view v0.29b15 >/dev/null 2>&1; then
-            gh release upload v0.29b15 downloads/0.29b15/BVE6Launcher-0.29b15-Portable.zip --clobber
-            gh release edit v0.29b15 --title 'Ver.0.29b15 (先行公開・ポータブル版) — BVE6互換ランチャー' --notes-file RELEASE_NOTES_0.29b15_PREVIEW.md --prerelease
+            gh release upload v0.29b15 downloads/0.29b15/BVE6Launcher-0.29b15-Portable.zip downloads/0.29b15/BVE6Launcher-Setup.exe --clobber
+            gh release edit v0.29b15 --title 'Ver.0.29b15 (先行公開・インストーラー／ポータブル版) — BVE6互換ランチャー' --notes-file RELEASE_NOTES_0.29b15_PREVIEW.md --prerelease
           else
-            gh release create v0.29b15 downloads/0.29b15/BVE6Launcher-0.29b15-Portable.zip \
+            gh release create v0.29b15 downloads/0.29b15/BVE6Launcher-0.29b15-Portable.zip downloads/0.29b15/BVE6Launcher-Setup.exe \
               --target "${GITHUB_SHA}" \
-              --title 'Ver.0.29b15 (先行公開・ポータブル版) — BVE6互換ランチャー' \
+              --title 'Ver.0.29b15 (先行公開・インストーラー／ポータブル版) — BVE6互換ランチャー' \
               --notes-file RELEASE_NOTES_0.29b15_PREVIEW.md --prerelease
           fi

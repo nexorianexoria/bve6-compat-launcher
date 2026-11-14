@@ -2,7 +2,7 @@
 
 **最新版：Ver.0.29b14（インストーラー／ポータブルZIP版）**
 
-**先行公開：Ver.0.29b15（ポータブルZIPのみ）。** 2026年11月14日の検証で、b15候補の一部EXEにMicrosoft Defenderの`Trojan:Win32/Wacatac.H!ml`検出がありました。誤検知かどうかは未判定です。検出を回避する操作は案内しません。b15のインストーラー・自動更新は公開していません。詳しくは[安全性検証結果](SECURITY_REVIEW_0.29b15.md)をご覧ください。
+**先行公開：Ver.0.29b15（インストーラー／ポータブルZIP）。** 2026年11月14日の検証で、b15候補の一部EXEにMicrosoft Defenderの`Trojan:Win32/Wacatac.H!ml`検出がありました。誤検知かどうかは未判定です。検出を回避する操作は案内しません。b15の自動更新はまだ公開していません。詳しくは[安全性検証結果](SECURITY_REVIEW_0.29b15.md)をご覧ください。
 
 BVE Trainsim 5/6向けの路線・車両を選び、BVE5またはBVE6を起動する非公式ランチャーです。BVE6で従来の32ビット版ATSプラグインを利用するための互換機能を搭載しています。
 
@@ -10,9 +10,11 @@ BVE Trainsim 5/6向けの路線・車両を選び、BVE5またはBVE6を起動�
 
 **[Ver.0.29b15 ポータブルZIP（先行公開・安全性未確認）](https://github.com/nexorianexoria/bve6-compat-launcher/raw/refs/heads/main/downloads/0.29b15/BVE6Launcher-0.29b15-Portable.zip)**
 
+**[Ver.0.29b15 インストーラー（先行公開・安全性未確認）](https://github.com/nexorianexoria/bve6-compat-launcher/releases/download/v0.29b15/BVE6Launcher-Setup.exe)**
+
 [Ver.0.29b15の先行公開リリースページ](https://github.com/nexorianexoria/bve6-compat-launcher/releases/tag/v0.29b15)
 
-この先行公開ZIPはインストーラーを含みません。個人開発アプリのため、ダウンロードや起動時にSmartScreenが「不明な発行元」と表示する場合があります。**その表示だけでマルウェアとは断定できませんが、安全性の保証でもありません。** Defenderが`Trojan:Win32/Wacatac.H!ml`等の脅威を検出した場合は、検疫を解除したり保護を無効化したりせず使用を中止してください。正式な安定版はb14です。
+この先行公開版はインストーラーとポータブルZIPを選べます。インストーラーはGitHubにあるb15のインストール用パッケージをダウンロードします。個人開発アプリのため、ダウンロードや起動時にSmartScreenが「不明な発行元」と表示する場合があります。**その表示だけでマルウェアとは断定できませんが、安全性の保証でもありません。** Defenderが`Trojan:Win32/Wacatac.H!ml`等の脅威を検出した場合は、検疫を解除したり保護を無効化したりせず使用を中止してください。インストールに成功するかは未確認で、正式な安定版はb14です。
 
 **[Ver.0.29b14 ダウンロード](https://github.com/nexorianexoria/bve6-compat-launcher/releases/latest)**
 

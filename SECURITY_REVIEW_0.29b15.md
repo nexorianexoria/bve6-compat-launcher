@@ -1,6 +1,6 @@
 # Ver.0.29b15 セキュリティ検証結果（2026年11月14日）
 
-**結論：安全性の判定は未完了です。v0.29b15は実機利用者による検証用にポータブルZIPを先行公開し、インストーラー・自動更新パッケージは配布していません。Windows Defenderが検出した場合は使用を中止してください。**
+**結論：安全性の判定は未完了です。v0.29b15は実機利用者による検証用にポータブルZIPとインストーラーを先行公開しました。ただし、インストール時のDefender検出・失敗のおそれは残ります。Windows Defenderが脅威を検出した場合は使用を中止してください。**
 
 ## 確認した事実
 
@@ -14,9 +14,11 @@
 
 ## 公開・インストールについて
 
-自動更新用`update.json`は安定版`0.29b14`のままとし、b15のインストーラー・自動更新パッケージは公開しません。検証用に[b15ポータブルZIP](downloads/0.29b15/BVE6Launcher-0.29b15-Portable.zip)を用意しました。これは安全と判定されたものではありません。最新の安定版は[Releases / latest](https://github.com/nexorianexoria/bve6-compat-launcher/releases/latest)から確認してください。
+自動更新用`update.json`は安定版`0.29b14`のままとし、既存インストールからのb15自動更新は始めていません。検証用に[b15ポータブルZIP](downloads/0.29b15/BVE6Launcher-0.29b15-Portable.zip)と[インストーラー](https://github.com/nexorianexoria/bve6-compat-launcher/releases/download/v0.29b15/BVE6Launcher-Setup.exe)を用意しました。インストーラーは[b15パッケージ](downloads/0.29b15/BVE6Launcher-package.zip)を取得して導入します。**インストーラーでの実インストール完了は未検証**であり、配布物のハッシュ一致は安全判定ではありません。最新の安定版は[Releases / latest](https://github.com/nexorianexoria/bve6-compat-launcher/releases/latest)から確認してください。
 
 ポータブルZIPのSHA-256：`A8CF2DC93D6231D6B1D61480EF9B0ACA86F5715D9D4D66B32F2EF528ACFA6B82`。ZIP内のランチャーEXEのSHA-256は、上記で示した実機テスト済みバイナリと一致しています。
+
+インストーラーのSHA-256：`F3B9B823FD87C6965DBC5A48D5EE8F316EF18BBE9F5FBD0D433E5B8C9FE594F0`。導入用パッケージのSHA-256：`091DD6C3EE867AA79281CDF7EB569E8A5C4A8D633B05399FFC457069D2F0C799`。ZIP内の12エントリ、11配布ファイルの内部SHA-256は検証済みです。
 
 警告が発生した実行ファイルを使うためにDefenderを無効化したり、例外登録をしたりしないでください。
 

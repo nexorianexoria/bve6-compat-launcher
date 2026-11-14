@@ -1,0 +1,7 @@
+{
+    "version":  "0.2.9.26",
+    "displayVersion":  "0.29b15",
+    "url":  "https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29b15/BVE6Launcher-package.zip",
+    "sha256":  "091DD6C3EE867AA79281CDF7EB569E8A5C4A8D633B05399FFC457069D2F0C799",
+    "notes":  "0.29b15：起動モニター表示を改善。BVE6背景音声の整数PCMを安全な作業コピー内で自動変換し、一時保存先のパスを短縮。元のBVE・路線・車両・WAVは変更しません。"
+}
