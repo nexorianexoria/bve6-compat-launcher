@@ -10,7 +10,9 @@ BVE Trainsim 5/6向けの路線・車両を選び、BVE5またはBVE6を起動�
 
 **[Ver.0.29b15 ポータブルZIP（先行公開・安全性未確認）](https://github.com/nexorianexoria/bve6-compat-launcher/raw/refs/heads/main/downloads/0.29b15/BVE6Launcher-0.29b15-Portable.zip)**
 
-この先行公開ZIPはインストーラーを含みません。Defenderが脅威を検出した場合、検疫を解除したり保護を無効化したりせず使用を中止してください。正式な安定版はb14です。
+[Ver.0.29b15の先行公開リリースページ](https://github.com/nexorianexoria/bve6-compat-launcher/releases/tag/v0.29b15)
+
+この先行公開ZIPはインストーラーを含みません。個人開発アプリのため、ダウンロードや起動時にSmartScreenが「不明な発行元」と表示する場合があります。**その表示だけでマルウェアとは断定できませんが、安全性の保証でもありません。** Defenderが`Trojan:Win32/Wacatac.H!ml`等の脅威を検出した場合は、検疫を解除したり保護を無効化したりせず使用を中止してください。正式な安定版はb14です。
 
 **[Ver.0.29b14 ダウンロード](https://github.com/nexorianexoria/bve6-compat-launcher/releases/latest)**
 

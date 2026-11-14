@@ -1,0 +1,59 @@
+name: Publish b15 portable preview
+
+on:
+  push:
+    tags:
+      - v0.29b15
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    if: github.repository == 'nexorianexoria/bve6-compat-launcher'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source and portable assets
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify b15 preview package and stable update channel
+        run: |
+          set -euo pipefail
+          test -s downloads/0.29b15/BVE6Launcher-0.29b15-Portable.zip
+          test -s RELEASE_NOTES_0.29b15_PREVIEW.md
+          test -s SECURITY_REVIEW_0.29b15.md
+          grep -q 'Trojan:Win32/Wacatac.H!ml' RELEASE_NOTES_0.29b15_PREVIEW.md
+          grep -q '"displayVersion":  "0.29b14"' update.json
+          python3 - <<'PY'
+          import hashlib, zipfile
+          path='downloads/0.29b15/BVE6Launcher-0.29b15-Portable.zip'
+          expected='A8CF2DC93D6231D6B1D61480EF9B0ACA86F5715D9D4D66B32F2EF528ACFA6B82'
+          with open(path,'rb') as f:
+              actual=hashlib.file_digest(f,'sha256').hexdigest().upper()
+          assert actual==expected, (actual, expected)
+          with zipfile.ZipFile(path) as z:
+              entries=[i for i in z.infolist() if not i.is_dir()]
+              assert len(entries)==8, len(entries)
+              exe=[i for i in entries if i.filename.endswith('/BVE6互換ランチャー.exe')]
+              assert len(exe)==1
+              with z.open(exe[0]) as f:
+                  digest=hashlib.sha256(f.read()).hexdigest().upper()
+              assert digest=='C03DD2405CF7EF395D39FBD1D7BEB4D1313558D08297393516A4131EDB233D1D'
+          print('HASH_AND_STRUCTURE_PASS')
+          PY
+      - name: Publish b15 portable prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if gh release view v0.29b15 >/dev/null 2>&1; then
+            gh release upload v0.29b15 downloads/0.29b15/BVE6Launcher-0.29b15-Portable.zip --clobber
+            gh release edit v0.29b15 --title 'Ver.0.29b15 (先行公開・ポータブル版) — BVE6互換ランチャー' --notes-file RELEASE_NOTES_0.29b15_PREVIEW.md --prerelease
+          else
+            gh release create v0.29b15 downloads/0.29b15/BVE6Launcher-0.29b15-Portable.zip \
+              --target "${GITHUB_SHA}" \
+              --title 'Ver.0.29b15 (先行公開・ポータブル版) — BVE6互換ランチャー' \
+              --notes-file RELEASE_NOTES_0.29b15_PREVIEW.md --prerelease
+          fi
