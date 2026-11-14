@@ -632,6 +632,7 @@ if(!bve5 && BveWindowOptions.Read(6).BackgroundAudio){
            " totalReferences="+verified.TotalReferences+" unsupported="+verified.UnsupportedReferences+
            " savedSettingsUnchanged=true");
           ready.Scenario=staged.ScenarioFile;
+          Diagnostics.CurrentRun=Path.GetDirectoryName(ready.Scenario);
           start.Arguments="\""+ready.Scenario+"\""+(NeedsLegacy(ready.Scenario)?" /legacy":"");
            status.Text="DSOAL用に音声の作業コピーを自動変換しました。元のWAVは変更していません。";
         }finally{
@@ -661,6 +662,67 @@ if(!bve5 && BveWindowOptions.Read(6).BackgroundAudio){
        nativeAudioOnlyThisTime=true;
        Diagnostics.Write("DSOAL_NATIVE_FALLBACK","explicit standard DirectSound chosen after PCM staging failure; saved setting unchanged");
     }
+  }else if(BveDsoalCompatibility.NeedsNormalPcmStaging(bve5,compat,true,audioCheck)){
+    // Never silently change to standard DirectSound. Prepare a private
+    // audio-only variant and keep the original vehicle and ATS untouched.
+    try {
+      if(Process.GetProcessesByName("BveTs").Any())
+        throw new InvalidOperationException("BVEの運転中は音声コピーを変換しません。");
+      Busy("BVE6通常起動用の音声を作業コピーで変換しています…");
+      using(var cancellation=new CancellationTokenSource()){
+        pcmStageCancellation=cancellation;
+        try{
+          // Without a manual vehicle override, PrepareNormal can return
+          // the original scenario. Create a private, resolved scenario only
+          // after a complete, known preflight of its actual vehicle.
+          if(!BvePcmFloatStaging.IsPrivatePreparedScenario(ready.Scenario)){
+            var copied=await Task.Run(()=>Program.PrepareNormal(
+              scenarioPath,audioCheck.VehicleFile,routeFromDetails,false),cancellation.Token);
+            ready=copied;
+            Diagnostics.CurrentRun=Path.GetDirectoryName(ready.Scenario);
+          }
+          var staged=await Task.Run(()=>BvePcmFloatStaging.StageNormalPreparedScenario(
+            ready.Scenario,cancellation.Token),cancellation.Token);
+          var verified=await Task.Run(()=>BveDsoalCompatibility.InspectScenario(
+            staged.ScenarioFile,null,cancellation.Token),cancellation.Token);
+          if(!verified.IsKnown || verified.UnsupportedReferences!=0 ||
+             verified.TotalReferences!=audioCheck.TotalReferences ||
+             verified.UniqueWavFiles!=audioCheck.UniqueWavFiles)
+            throw new InvalidDataException("通常起動用の音声コピーを検証できません。"+
+              (verified.UnknownReason??""));
+          if(Process.GetProcessesByName("BveTs").Any())
+            throw new InvalidOperationException("音声変換中にBVEが起動したため中止しました。");
+          ready.Scenario=staged.ScenarioFile;
+          start.Arguments="\""+ready.Scenario+"\""+(NeedsLegacy(ready.Scenario)?" /legacy":"");
+          Diagnostics.Write("DSOAL_NORMAL_PCM_STAGE",
+            "convertedFiles="+staged.ConvertedFiles+
+            " changedReferences="+staged.ChangedReferences+
+            " unsupported="+verified.UnsupportedReferences+
+            " backgroundAudioMaintained=true originalVehicleAndATSUnchanged=true");
+          status.Text="BVE6通常起動：音声の一時コピーを作成し、バックグラウンド音声を維持しました。";
+        }finally{pcmStageCancellation=null;}
+      }
+    }catch(Exception ex) when(ex is IOException || ex is InvalidDataException ||
+      ex is UnauthorizedAccessException || ex is ArgumentException ||
+      ex is NotSupportedException || ex is InvalidOperationException){
+      Diagnostics.Error("DSOAL_NORMAL_PCM_FAILED",ex);
+      status.Text="BVE6通常起動の音声変換を完了できず、元の設定を維持して起動を中止しました。";
+      MessageBox.Show(this,"元の車両・WAV・ATSとバックグラウンド音声設定は変更していません。\n"+
+        "安全に音声コピーを作成できなかったため、BVEは起動していません。\n"+
+        ex.Message,"通常起動の音声互換処理",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+      return;
+    }
+  }else if(!bve5 && !compat && !audioCheck.IsKnown){
+    // Do not silently or interactively replace the user's selected DSOAL
+    // audio backend in BVE6 normal mode. Unknown inputs fail closed.
+    Diagnostics.Write("DSOAL_NORMAL_UNKNOWN_CANCEL",
+      "backgroundAudioMaintained=true; reason="+(audioCheck.UnknownReason??""));
+    status.Text="BVE6通常起動：音声形式を確認できず、設定を保持して起動を中止しました。";
+    MessageBox.Show(this,
+      "BVE6通常起動の音声形式を最後まで確認できませんでした。\n"+
+      (audioCheck.UnknownReason??"")+"\n\n標準音声へ切り替えず、元の音声・車両・ATS・設定を保持して起動を中止します。",
+      "音声の互換性を確認",MessageBoxButtons.OK,MessageBoxIcon.Warning);
+    return;
   }else if(BveDsoalCompatibility.NeedsNativeChoice(audioCheck)){
     bool nativeApproved=ConfirmNativeAudioFallback(audioCheck);
     var decision=BveDsoalCompatibility.DecideGui(false,true,audioCheck,nativeApproved);

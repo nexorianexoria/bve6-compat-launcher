@@ -1,0 +1,61 @@
+name: Publish b18 installer test preview
+
+on:
+  push:
+    tags:
+      - v0.29b18
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  preview:
+    if: github.repository == 'nexorianexoria/bve6-compat-launcher'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify b18 package before release
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum -c downloads/0.29b18/SHA256SUMS.txt
+          grep -q 'Trojan:Win32/Wacatac.H!ml' RELEASE_NOTES_0.29b18_PREVIEW.md
+          grep -q '0.29b14' update.json
+          python3 - <<'PY'
+          import hashlib, json, zipfile
+          root='downloads/0.29b18/'
+          with open(root+'package.json',encoding='utf-8-sig') as f:
+              m=json.load(f)
+          assert (m['version'],m['displayVersion'])==('0.2.9.29','0.29b18')
+          assert m['url']=='https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29b18/BVE6Launcher-package.zip'
+          with open(root+'BVE6Launcher-package.zip','rb') as f:
+              h=hashlib.file_digest(f,'sha256').hexdigest().upper()
+          assert h==m['sha256'].upper()
+          with zipfile.ZipFile(root+'BVE6Launcher-package.zip') as z:
+              files=[x for x in z.namelist() if not x.endswith('/')]
+              assert len(files)==11
+              assert '導入・更新.exe' not in files
+              assert 'package-index.json' in files
+              index=json.loads(z.read('package-index.json'))
+              assert index['version']=='0.2.9.29'
+              assert index['displayVersion']=='0.29b18'
+              assert set(index['files'])==set(files)-{'package-index.json'}
+              for name,expected in index['files'].items():
+                  assert hashlib.sha256(z.read(name)).hexdigest().upper()==expected.upper(),name
+          print('B18_INTEGRITY_PASS')
+          PY
+      - name: Publish clearly labeled test build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          assets=(downloads/0.29b18/BVE6Launcher-Setup.exe downloads/0.29b18/BVE6Launcher-0.29b18-Portable.zip)
+          if gh release view v0.29b18 >/dev/null 2>&1; then
+            gh release upload v0.29b18 "${assets[@]}" --clobber
+            gh release edit v0.29b18 --title 'Ver.0.29b18 (通常起動の音声維持・試験版)' --notes-file RELEASE_NOTES_0.29b18_PREVIEW.md --prerelease
+          else
+            gh release create v0.29b18 "${assets[@]}" --target "$GITHUB_SHA" --title 'Ver.0.29b18 (通常起動の音声維持・試験版)' --notes-file RELEASE_NOTES_0.29b18_PREVIEW.md --prerelease
+          fi

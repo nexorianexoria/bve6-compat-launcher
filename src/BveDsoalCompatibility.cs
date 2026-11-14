@@ -35,6 +35,13 @@ internal static class BveDsoalCompatibility {
         return !bve5 && compat && backgroundRequested && check!=null &&
             check.IsKnown && check.UnsupportedReferences>0;
     }
+    // For normal BVE6 with explicitly enabled DSOAL, keep the original
+    // vehicle/ATS and saved audio setting. Make a private audio-only copy.
+    internal static bool NeedsNormalPcmStaging(bool bve5,bool compat,
+        bool backgroundRequested,Check check) {
+        return !bve5 && !compat && backgroundRequested && check!=null &&
+            check.IsKnown && check.UnsupportedReferences>0;
+    }
     internal static GuiDecision DecideGui(bool bve5,bool backgroundRequested,
         Check check,bool? explicitYes) {
         if(bve5 || !backgroundRequested || !NeedsNativeChoice(check))

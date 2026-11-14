@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using System.Xml.Linq;
 
 // Converts unsupported integer PCM 24/32-bit WAVs to IEEE float32 only inside
 // the launcher's private, disposable run directory. Original WAV files are
@@ -244,6 +245,109 @@ internal static class BvePcmFloatStaging {
         }
         if(matched!=1)throw new InvalidDataException("起動用ファイルの "+key+" 指定が一意ではありません。");
         return result;
+    }
+    internal static bool IsPrivatePreparedScenario(string scenario){
+        if(String.IsNullOrWhiteSpace(scenario))return false;
+        string full=Path.GetFullPath(scenario);
+        string run=Path.GetDirectoryName(full);
+        string root=Path.GetFullPath(Program.Data).TrimEnd(Path.DirectorySeparatorChar);
+        return Inside(run,root) &&
+            Path.GetFileName(full).Equals("scenario.txt",StringComparison.OrdinalIgnoreCase);
+    }
+    // BVE6 normal mode must keep native vehicle/ATS behavior and the saved
+    // DSOAL setting. Build *only* private text copies with absolute references
+    // to the original assets, then reuse the audited float32 WAV staging.
+    // No source WAV, Sound.txt, vehicle, ATS or plugin is ever written to.
+    internal static Result StageNormalPreparedScenario(string preparedScenario,CancellationToken cancel){
+        cancel.ThrowIfCancellationRequested();
+        string scenario=Path.GetFullPath(preparedScenario);
+        if(!IsPrivatePreparedScenario(scenario))
+            throw new InvalidOperationException("通常起動の音声変換はランチャー作業コピーに限ります。");
+        string preparedRun=Path.GetDirectoryName(scenario);
+        string root=Path.GetFullPath(Program.Data).TrimEnd(Path.DirectorySeparatorChar);
+        ValidatePrivateRun(preparedRun,root);
+        EnsureNoReparse(scenario);
+        string[] scenarioLines=Program.Read(scenario);
+        if(scenarioLines.Length==0 || !Program.ScenarioHeader(scenarioLines[0]))
+            throw new InvalidDataException("作業用シナリオを確認できません。");
+        string vehicleRef=Program.Value(scenarioLines,"Vehicle");
+        if(String.IsNullOrWhiteSpace(vehicleRef) ||
+           vehicleRef.IndexOfAny(new[]{'|','*','?'})>=0)
+            throw new InvalidDataException("通常起動の車両指定を一意に確認できません。");
+        string originalVehicle=Full(preparedRun,vehicleRef);
+        EnsureNoReparse(originalVehicle);
+        string[] vehicleLines=Program.Read(originalVehicle);
+        if(vehicleLines.Length==0 || !Program.VehicleHeader(vehicleLines[0]))
+            throw new InvalidDataException("元の車両定義を確認できません。");
+        string vehicleDir=Path.GetDirectoryName(originalVehicle);
+        string soundRef=Program.Value(vehicleLines,"Sound");
+        if(String.IsNullOrWhiteSpace(soundRef))
+            throw new InvalidDataException("変換対象のSound.txtが指定されていません。");
+        string originalSound=Full(vehicleDir,soundRef);
+        EnsureNoReparse(originalSound);
+        string[] soundLines=Program.Read(originalSound);
+        var resolvedSound=new string[soundLines.Length];
+        for(int i=0;i<soundLines.Length;i++){
+            cancel.ThrowIfCancellationRequested();
+            var p=Program.Pair(soundLines[i]);
+            resolvedSound[i]=String.IsNullOrEmpty(p.Key)||String.IsNullOrEmpty(p.Value)
+                ? soundLines[i]
+                : p.Key+" = "+Full(Path.GetDirectoryName(originalSound),p.Value);
+        }
+        // A fresh sibling run keeps the normal-mode prepared scenario intact
+        // while producing a consistent scenario -> vehicle -> Sound chain.
+        string run=Path.Combine(root,"run-"+DateTime.Now.ToString("yyyyMMdd-HHmmss")+
+            "-"+Guid.NewGuid().ToString("N").Substring(0,6));
+        Directory.CreateDirectory(run);
+        ValidatePrivateRun(run,root);
+        string copiedSound=Path.Combine(run,"sound.txt");
+        string copiedVehicle=Path.Combine(run,"vehicle.txt");
+        // Keep the original ATS64/Ats32/Ats references *exactly* the same
+        // files, resolving relative paths from the original vehicle folder.
+        var nativeFileKeys=new HashSet<string>(new[]{"PerformanceCurve","Parameters",
+            "Panel","MotorNoise","Ats","Ats32","Ats64"},StringComparer.OrdinalIgnoreCase);
+        var resolvedVehicle=new string[vehicleLines.Length];
+        for(int i=0;i<vehicleLines.Length;i++){
+            cancel.ThrowIfCancellationRequested();
+            var p=Program.Pair(vehicleLines[i]);
+            if(p.Key.Equals("Sound",StringComparison.OrdinalIgnoreCase))
+                resolvedVehicle[i]="Sound = "+copiedSound;
+            else if(nativeFileKeys.Contains(p.Key) && !String.IsNullOrWhiteSpace(p.Value)){
+                string source=Full(vehicleDir,p.Value);
+                if(!File.Exists(source))throw new FileNotFoundException(
+                    "通常起動の元車両参照が見つかりません: "+source);
+                resolvedVehicle[i]=p.Key+" = "+source;
+            }else resolvedVehicle[i]=vehicleLines[i];
+        }
+        // Retain BveEX sidecar selection when a native vehicle supplies it.
+        var configs=new[]{
+            new[]{Path.Combine(vehicleDir,"VehiclePluginUsing.xml"),
+                  Path.Combine(run,"VehiclePluginUsing.xml")},
+            new[]{Path.ChangeExtension(originalVehicle,".VehiclePluginUsing.xml"),
+                  Path.Combine(run,"vehicle.VehiclePluginUsing.xml")}
+        };
+        foreach(string[] config in configs){
+            cancel.ThrowIfCancellationRequested();
+            if(!File.Exists(config[0]))continue;
+            EnsureNoReparse(config[0]);
+            var xml=XDocument.Load(config[0]);
+            foreach(var attr in xml.Descendants().Attributes("Path")){
+                if(String.IsNullOrWhiteSpace(attr.Value))continue;
+                string source=Full(Path.GetDirectoryName(config[0]),attr.Value);
+                if(!File.Exists(source))throw new FileNotFoundException(
+                    "元のBveEXプラグインが見つかりません: "+source);
+                attr.Value=source;
+            }
+            using(var stream=new FileStream(config[1],FileMode.CreateNew,
+                FileAccess.Write,FileShare.None))xml.Save(stream);
+        }
+        // CreateNew guarantees this cannot overwrite a prepared or original
+        // file even if a stale same-name file appears during the operation.
+        WriteNewLines(copiedSound,resolvedSound);
+        WriteNewLines(copiedVehicle,resolvedVehicle);
+        string copiedScenario=Path.Combine(run,"scenario.txt");
+        WriteNewLines(copiedScenario,ReplaceOne(scenarioLines,"Vehicle",copiedVehicle));
+        return StagePreparedScenario(copiedScenario,cancel);
     }
     internal static Result StagePreparedScenario(string preparedScenario,CancellationToken cancel){
         cancel.ThrowIfCancellationRequested();

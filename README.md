@@ -1,6 +1,8 @@
 # BVE5 Vehicle Compatibility for BVE6 / BVE6互換ランチャー
 
-**安定版：Ver.0.29b14／音声形式修正の試験版：Ver.0.29b17**
+**安定版：Ver.0.29b14／通常起動の音声維持を修正した試験版：Ver.0.29b18**
+
+**[Ver.0.29b18 修正版インストーラー](https://github.com/nexorianexoria/bve6-compat-launcher/releases/tag/v0.29b18)** — BVE6通常起動で、バックグラウンド音声を標準DirectSoundへ切り替えず、検証済みの整数PCMだけをランチャー専用の作業コピーで変換します。**元の車両・音声・ATSと保存設定は変更しません。** 変換に失敗した場合は、標準音声へ勝手に切り替えず起動を中止します。詳細は[検証結果](RELEASE_NOTES_0.29b18_PREVIEW.md)を参照してください。
 
 **[Ver.0.29b17 修正版インストーラー](https://github.com/nexorianexoria/bve6-compat-launcher/releases/tag/v0.29b17)** — 東急3020系で検出されたRIFF末尾データとWavosaurのSAURチャンクを、元音声を変更せずに検査・処理する修正です。以前のb16で修正したインストーラーの仕組みも引き継いでいます。詳細は[検証結果](RELEASE_NOTES_0.29b17_PREVIEW.md)をご覧ください。試験版のため、実走行時の音声・安全性を保証するものではありません。
 
