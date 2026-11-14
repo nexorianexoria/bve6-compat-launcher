@@ -23,6 +23,7 @@ internal static class BvePcmFloatStaging {
         internal long DataOffset;
         internal uint Frames;
         internal long OutputLength;
+        internal long SaurChunkOffset=-1;
         internal string SourceSha256;
     }
     static string FourCC(BinaryReader r){
@@ -101,6 +102,20 @@ internal static class BvePcmFloatStaging {
                     data=true;
                     info.DataOffset=start;
                     info.DataLength=size;
+                }else if(id=="SAUR"){
+                    // The user's Wavosaur 1.8.0.0 files carry a 32-byte
+                    // version/zero-padded metadata chunk after the samples.
+                    // Preserve this *verbatim* in the staged float WAV;
+                    // never interpret metadata as additional PCM samples.
+                    if(!data || info.SaurChunkOffset>=0 || size!=32)
+                        throw new NotSupportedException("未確認のSAURメタデータです: "+file);
+                    byte[] metadata=input.ReadBytes(32);
+                    byte[] version=Encoding.ASCII.GetBytes("1.8.0.0\0");
+                    if(metadata.Length!=32 ||
+                       !version.SequenceEqual(metadata.Take(version.Length)) ||
+                       metadata.Skip(version.Length).Any(b=>b!=0))
+                        throw new NotSupportedException("未確認のSAURバージョン情報です: "+file);
+                    info.SaurChunkOffset=start-8;
                 }else {
                     // Dropping unknown chunks (including loop metadata) can
                     // change playback semantics. Reject rather than guess.
@@ -114,6 +129,8 @@ internal static class BvePcmFloatStaging {
             info.Frames=info.DataLength/info.BlockAlign;
             // 12 RIFF + 24 fmt + 12 fact + 8 data + N float bytes.
             info.OutputLength=56L+(long)info.Frames*info.Channels*4;
+            // Eight chunk-header bytes plus 32 Wavosaur metadata bytes.
+            if(info.SaurChunkOffset>=0)info.OutputLength+=40;
             if(info.OutputLength>uint.MaxValue || info.OutputLength>MaxSourceBytes)
                 throw new InvalidDataException("変換後のWAVがサイズ上限を超えます: "+file);
             info.SourceSha256=Sha256(stream,cancellation);
@@ -171,6 +188,15 @@ internal static class BvePcmFloatStaging {
                     value=(float)((double)reader.ReadInt32()/2147483648.0);
                 }
                 writer.Write(value);
+            }
+            if(info.SaurChunkOffset>=0){
+                inputStream.Position=info.SaurChunkOffset;
+                byte[] saur=reader.ReadBytes(40);
+                if(saur.Length!=40 ||
+                   Encoding.ASCII.GetString(saur,0,4)!="SAUR" ||
+                   BitConverter.ToUInt32(saur,4)!=32)
+                    throw new InvalidDataException("SAURメタデータが検査後に変更されました: "+source);
+                writer.Write(saur);
             }
             writer.Flush();
             if(outputStream.Length!=info.OutputLength)

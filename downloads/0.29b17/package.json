@@ -1,0 +1,7 @@
+{
+    "version":  "0.2.9.28",
+    "displayVersion":  "0.29b17",
+    "url":  "https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29b17/BVE6Launcher-package.zip",
+    "sha256":  "4DA15D15177604412FBC26F87800F1630B62C1FD84BC9FA498BB391DA926168C",
+    "notes":  "0.29b17：RIFF末尾データの限定検査とWavosaur SAURメタデータ保持に対応。"
+}

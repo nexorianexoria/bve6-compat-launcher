@@ -189,8 +189,17 @@ internal static class BveDsoalCompatibility {
             if(new String(reader.ReadChars(4))!="WAVE")
                 throw new InvalidDataException("WAVE形式でない音声: "+file);
             long end=8L+riffLength;
-            if(riffLength<4 || end!=s.Length)
+            // RIFF's declared length bounds its chunks. Some third-party
+            // 8/16-bit WAVs append raw bytes *after* a complete RIFF form.
+            // Such bytes are not part of a RIFF chunk. Inspect only the
+            // declared form and never infer an extended data chunk from them.
+            // Do not relax the header check for files needing PCM conversion:
+            // converting a truncated/ambiguous source can alter its audio.
+            if(riffLength<4 || end>s.Length)
                 throw new InvalidDataException("RIFFサイズが不正: "+file);
+            bool trailingBytes=end<s.Length;
+            string lastChunk=null;
+            ushort blockAlign=0;
             bool? unsupported=null;
             bool hasData=false;
             while(s.Position+8<=end){
@@ -199,14 +208,24 @@ internal static class BveDsoalCompatibility {
                 long start=s.Position;
                 long next=start+length+(length&1);
                 if(next>end)throw new InvalidDataException("WAVチャンク長が不正: "+file);
+                lastChunk=id;
                 if(id=="fmt "){
                     if(unsupported.HasValue)
                         throw new InvalidDataException("WAV形式情報が重複: "+file);
                     if(length<16)throw new InvalidDataException("WAV形式情報が不足: "+file);
                     ushort tag=reader.ReadUInt16();
                     ushort channels=reader.ReadUInt16();
-                    reader.ReadUInt32();reader.ReadUInt32();reader.ReadUInt16();
+                    uint sampleRate=reader.ReadUInt32();
+                    uint byteRate=reader.ReadUInt32();
+                    blockAlign=reader.ReadUInt16();
                     ushort bits=reader.ReadUInt16();
+                    // With bytes outside the declared RIFF, accept only a
+                    // well-formed format inside RIFF. Do not interpret the
+                    // extra bytes as additional samples or metadata.
+                    if(trailingBytes && (channels<1 || channels>2 ||
+                       sampleRate==0 || blockAlign!=channels*((bits+7)/8) ||
+                       (long)byteRate!=(long)sampleRate*blockAlign))
+                        throw new InvalidDataException("RIFF外にデータがあるWAVの形式情報が不正: "+file);
                     if(tag==1){
                         if(bits==24 || bits==32)unsupported=true;
                         else if((bits==8 || bits==16) && (channels==1 || channels==2))unsupported=false;
@@ -236,7 +255,13 @@ internal static class BveDsoalCompatibility {
                     }
                     else throw new InvalidDataException("未確認のWAV形式番号: "+tag+" "+file);
                 }
-                else if(id=="data")hasData=true;
+                else if(id=="data"){
+                    if(trailingBytes && hasData)
+                        throw new InvalidDataException("RIFF外にデータがあるWAVのdataチャンクが重複: "+file);
+                    hasData=true;
+                    if(trailingBytes && (blockAlign==0 || length==0 || length%blockAlign!=0))
+                        throw new InvalidDataException("RIFF外にデータがあるWAVの音声境界が不正: "+file);
+                }
                 s.Position=next;
             }
             if(s.Position!=end)
@@ -245,6 +270,13 @@ internal static class BveDsoalCompatibility {
                 throw new InvalidDataException("WAV形式情報がありません: "+file);
             if(!hasData)
                 throw new InvalidDataException("WAVデータチャンクがありません: "+file);
+            if(trailingBytes && (unsupported.Value || lastChunk!="data" ||
+                (s.Length-end)%blockAlign!=0))
+                throw new InvalidDataException("変換対象WAVのRIFF外に追加データがあります: "+file);
+            if(trailingBytes)
+                Diagnostics.Write("DSOAL_RIFF_TRAILER",
+                    "RIFF内のみで形式を判定。宣言外の"+(s.Length-end)+
+                    "バイトは音声として扱わず、元ファイルは変更しません: "+file);
             return unsupported.Value;
         }
     }

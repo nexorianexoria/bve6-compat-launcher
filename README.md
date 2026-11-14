@@ -1,6 +1,8 @@
 # BVE5 Vehicle Compatibility for BVE6 / BVE6互換ランチャー
 
-**安定版：Ver.0.29b14／インストーラー試験版：Ver.0.29b16**
+**安定版：Ver.0.29b14／音声形式修正の試験版：Ver.0.29b17**
+
+**[Ver.0.29b17 修正版インストーラー](https://github.com/nexorianexoria/bve6-compat-launcher/releases/tag/v0.29b17)** — 東急3020系で検出されたRIFF末尾データとWavosaurのSAURチャンクを、元音声を変更せずに検査・処理する修正です。以前のb16で修正したインストーラーの仕組みも引き継いでいます。詳細は[検証結果](RELEASE_NOTES_0.29b17_PREVIEW.md)をご覧ください。試験版のため、実走行時の音声・安全性を保証するものではありません。
 
 **[Ver.0.29b16 インストーラー試験版](https://github.com/nexorianexoria/bve6-compat-launcher/releases/tag/v0.29b16)** — b15のインストール時、Defenderが必須だった別の更新用EXEを検疫し、導入が失敗したことを受け、更新用EXEを廃止して本体に処理をまとめた版です。テストフォルダーへのオフライン導入は成功しましたが、インストーラーの実機導入や他のPCでの安全性は未確認です。Defenderで脅威が検出された場合は使用を中止してください。
 

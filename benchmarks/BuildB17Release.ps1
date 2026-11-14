@@ -1,0 +1,68 @@
+$ErrorActionPreference='Stop'
+$root=if($PSScriptRoot){Split-Path -Parent $PSScriptRoot}else{(Get-Location).Path}
+Set-Location $root
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$version='0.2.9.28'
+$display='0.29b17'
+$out=Join-Path $root 'downloads\0.29b17'
+if(Test-Path -LiteralPath $out){throw 'The b17 output already exists; do not silently overwrite a published release'}
+New-Item -ItemType Directory -Path $out | Out-Null
+$build=Join-Path $root 'dist-b17-release'
+$names=@('BVE6互換ランチャー.exe','LauncherStarter.exe','Uninstall.exe','launcher.ico','LICENSE.txt','README.txt','THIRD_PARTY_NOTICES.txt','bridge/Bve5VehicleCompatibility.exe','bridge/Bve5VehicleCompatibility_.dll','bridge/LICENSE.txt')
+$staging=Join-Path $out 'package-staging'
+$portable=Join-Path $out 'BVE6Launcher-0.29b17-Portable'
+New-Item -ItemType Directory -Path $staging,$portable | Out-Null
+try {
+    foreach($name in $names){
+        $source=if($name -in @('LICENSE.txt','README.txt','THIRD_PARTY_NOTICES.txt')){Join-Path $root $name}else{Join-Path $build $name}
+        if(!(Test-Path -LiteralPath $source -PathType Leaf)){throw ('Required release file missing: '+$name)}
+        $destination=Join-Path $staging $name
+        New-Item -ItemType Directory -Path (Split-Path $destination) -Force | Out-Null
+        Copy-Item -LiteralPath $source -Destination $destination
+        if($name -in @('BVE6互換ランチャー.exe','LauncherStarter.exe','Uninstall.exe')){
+            $info=[Diagnostics.FileVersionInfo]::GetVersionInfo($source)
+            if($info.FileVersion -ne $version -or $info.ProductVersion -ne $display){throw ('Binary version mismatch: '+$name)}
+        }
+        if($name -notin @('LauncherStarter.exe','Uninstall.exe')){
+            $port=Join-Path $portable $name
+            New-Item -ItemType Directory -Path (Split-Path $port) -Force | Out-Null
+            Copy-Item -LiteralPath $source -Destination $port
+        }
+    }
+    $hashes=@{}
+    foreach($name in $names){$hashes[$name]=(Get-FileHash -LiteralPath (Join-Path $staging $name) -Algorithm SHA256).Hash}
+    $index=[ordered]@{version=$version;displayVersion=$display;files=$hashes}
+    [IO.File]::WriteAllText((Join-Path $staging 'package-index.json'),($index|ConvertTo-Json -Depth 7),[Text.UTF8Encoding]::new($false))
+    $package=Join-Path $out 'BVE6Launcher-package.zip'
+    $archive=[IO.Compression.ZipFile]::Open($package,[IO.Compression.ZipArchiveMode]::Create)
+    try {
+        foreach($name in $names + @('package-index.json')){
+            $source=Join-Path $staging $name
+            [void][IO.Compression.ZipFileExtensions]::CreateEntryFromFile($archive,$source,$name.Replace('\','/'),[IO.Compression.CompressionLevel]::Optimal)
+        }
+    }finally{$archive.Dispose()}
+    $portableZip=Join-Path $out 'BVE6Launcher-0.29b17-Portable.zip'
+    Compress-Archive -Path $portable -DestinationPath $portableZip -CompressionLevel Optimal
+    Copy-Item -LiteralPath (Join-Path $build 'BVE6Launcher-Setup.exe') -Destination $out
+    $sha=(Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash
+    $manifest=[ordered]@{
+        version=$version;displayVersion=$display
+        url='https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29b17/BVE6Launcher-package.zip'
+        sha256=$sha
+        notes='0.29b17：WAVのRIFF外データ判定を限定修正し、確認済みのWavosaur SAUR情報を変換用コピーに保持します。'
+    }
+    $json=$manifest|ConvertTo-Json -Depth 5
+    [IO.File]::WriteAllText((Join-Path $out 'package.json'),$json,[Text.UTF8Encoding]::new($false))
+    # Keep update.json targeting the last stable release until independently tested.
+    # GitHub provides a source archive automatically. Do not attach duplicate
+    # archives, checksums or internal updater packages to the user-facing release.
+    $files=@('BVE6Launcher-0.29b17-Portable.zip','BVE6Launcher-Setup.exe','BVE6Launcher-package.zip')
+    $sums=foreach($file in $files){$hash=(Get-FileHash -LiteralPath (Join-Path $out $file) -Algorithm SHA256).Hash.ToLowerInvariant();$hash+'  downloads/0.29b17/'+$file}
+    [IO.File]::WriteAllLines((Join-Path $out 'SHA256SUMS.txt'),[string[]]$sums,[Text.UTF8Encoding]::new($false))
+    Write-Output 'B17_PACKAGE_CREATED'
+    Write-Output ('PACKAGED_VERSION='+$display)
+    Write-Output ('PACKAGE_SHA256='+$sha)
+}finally{
+    Remove-Item -LiteralPath $staging,$portable -Recurse -Force -ErrorAction SilentlyContinue
+}
