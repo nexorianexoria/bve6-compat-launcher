@@ -1,6 +1,6 @@
 # Ver.0.29b15 セキュリティ検証結果（2026年11月14日）
 
-**結論：安全性の判定が未完了のため、v0.29b15の実行ファイル・インストーラー・自動更新パッケージは配布していません。ソースコードのみ先行公開しています。**
+**結論：安全性の判定は未完了です。v0.29b15は実機利用者による検証用にポータブルZIPを先行公開し、インストーラー・自動更新パッケージは配布していません。Windows Defenderが検出した場合は使用を中止してください。**
 
 ## 確認した事実
 
@@ -14,10 +14,12 @@
 
 ## 公開・インストールについて
 
-自動更新用`update.json`は安定版`0.29b14`のままとし、b15の配布ZIPおよびインストーラーは公開しません。GitHub上に公開しているb15の内容は、レビュー可能なソースコードです。最新のインストール可能なリリースは[Releases / latest](https://github.com/nexorianexoria/bve6-compat-launcher/releases/latest)から確認してください。
+自動更新用`update.json`は安定版`0.29b14`のままとし、b15のインストーラー・自動更新パッケージは公開しません。検証用に[b15ポータブルZIP](downloads/0.29b15/BVE6Launcher-0.29b15-Portable.zip)を用意しました。これは安全と判定されたものではありません。最新の安定版は[Releases / latest](https://github.com/nexorianexoria/bve6-compat-launcher/releases/latest)から確認してください。
+
+ポータブルZIPのSHA-256：`A8CF2DC93D6231D6B1D61480EF9B0ACA86F5715D9D4D66B32F2EF528ACFA6B82`。ZIP内のランチャーEXEのSHA-256は、上記で示した実機テスト済みバイナリと一致しています。
 
 警告が発生した実行ファイルを使うためにDefenderを無効化したり、例外登録をしたりしないでください。
 
 ## 今後の確認
 
-Microsoftの[ファイル分析申請](https://www.microsoft.com/en-us/wdsi/filesubmission)を行い、判定を得た後に配布物を再構築・検査する予定です。**分析への提出・再配布の実施は未完了です。**
+Microsoftの[ファイル分析申請](https://www.microsoft.com/en-us/wdsi/filesubmission)による判定を得ていません。**分析への提出と安全性判定は未完了です。**

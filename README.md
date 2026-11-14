@@ -2,11 +2,15 @@
 
 **最新版：Ver.0.29b14（インストーラー／ポータブルZIP版）**
 
-**ソースコード先行公開：Ver.0.29b15（実行ファイルは未配布）。** 2026年11月14日の検証で、b15候補の一部EXEにMicrosoft Defenderの`Trojan:Win32/Wacatac.H!ml`検出がありました。誤検知かどうかは未判定です。検出を回避する操作は案内しません。安全性の判断がつくまでb15のZIP・インストーラー・自動更新は公開していません。詳しくは[安全性検証結果](SECURITY_REVIEW_0.29b15.md)をご覧ください。
+**先行公開：Ver.0.29b15（ポータブルZIPのみ）。** 2026年11月14日の検証で、b15候補の一部EXEにMicrosoft Defenderの`Trojan:Win32/Wacatac.H!ml`検出がありました。誤検知かどうかは未判定です。検出を回避する操作は案内しません。b15のインストーラー・自動更新は公開していません。詳しくは[安全性検証結果](SECURITY_REVIEW_0.29b15.md)をご覧ください。
 
 BVE Trainsim 5/6向けの路線・車両を選び、BVE5またはBVE6を起動する非公式ランチャーです。BVE6で従来の32ビット版ATSプラグインを利用するための互換機能を搭載しています。
 
 ## ダウンロード
+
+**[Ver.0.29b15 ポータブルZIP（先行公開・安全性未確認）](https://github.com/nexorianexoria/bve6-compat-launcher/raw/refs/heads/main/downloads/0.29b15/BVE6Launcher-0.29b15-Portable.zip)**
+
+この先行公開ZIPはインストーラーを含みません。Defenderが脅威を検出した場合、検疫を解除したり保護を無効化したりせず使用を中止してください。正式な安定版はb14です。
 
 **[Ver.0.29b14 ダウンロード](https://github.com/nexorianexoria/bve6-compat-launcher/releases/latest)**
 
@@ -18,11 +22,11 @@ BVE Trainsim 5/6向けの路線・車両を選び、BVE5またはBVE6を起動�
 
 [旧版のダウンロード](https://github.com/nexorianexoria/bve6-compat-launcher/releases)
 
-## b15ソースコードの変更点（バイナリ未配布）
+## b15先行公開版の変更点
 
 起動モニターへのBVEメイン画面の再配置処理を改善しました。また、BVE6互換起動でバックグラウンド音声を使用する場合に、事前確認に合格した24/32bit整数PCM WAVを作業コピー内でIEEE float32 WAVへ変換する処理と、DSOALログの読み取り専用診断を追加しました。元のBVE本体、路線、車両、ATS、WAVは変更しない設計です。
 
-実機で2つのシナリオの起動・終了を確認しましたが、全ての車両の音声再生やFPS向上は確認していません。**このソース変更はb14の配布版やインストール済みアプリの更新には反映されません。**
+実機で2つのシナリオの起動・終了を確認しましたが、全ての車両の音声再生やFPS向上は確認していません。**この先行公開版はb14の配布版やインストール済みアプリへの自動更新には反映されません。**
 
 ## b14の改善
 
