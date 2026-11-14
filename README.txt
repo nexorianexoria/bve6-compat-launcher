@@ -1,4 +1,4 @@
-BVE5 Vehicle Compatibility for BVE6 — Ver.0.29b14
+BVE5 Vehicle Compatibility for BVE6 — Ver.0.29b16（インストーラー試験版）
 BVE6互換ランチャー（非公式ツール）
 
 ■ 導入方法
@@ -42,4 +42,7 @@ BVE本体、路線・車両、外部ATS等は同梱していません。
 ■ 注意事項
 このソフトは非公式ツールです。実行ファイルはコード署名されていません。
 セキュリティソフトで脅威が検出された場合、実行せず、保護機能を無効化しないでください。
+この試験版は、別の更新用EXEを必須とする設計を廃止し、ランチャー本体に管理処理を統合しました。
+インストール・更新時に以前のバージョンを自動削除せず、元のBVE本体・路線・車両・WAVは変更しません。
+以前の版ではWindows DefenderがTrojan:Win32/Wacatac.H!mlを検出しており、誤検知かどうかは未確定です。
 LICENSE.txt、THIRD_PARTY_NOTICES.txt、bridge/LICENSE.txtを確認してください。

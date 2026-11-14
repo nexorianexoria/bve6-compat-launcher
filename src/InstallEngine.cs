@@ -11,7 +11,20 @@ using System.Web.Script.Serialization;
 // No network, registry, process launch or user-data deletion is performed by this class.
 internal static class InstallEngine {
     internal const string AppName="BVE6互換ランチャー";
-    internal static readonly string[] PayloadNames={"BVE6互換ランチャー.exe","導入・更新.exe","LauncherStarter.exe","Uninstall.exe","launcher.ico","LICENSE.txt","README.txt","THIRD_PARTY_NOTICES.txt","bridge/Bve5VehicleCompatibility.exe","bridge/Bve5VehicleCompatibility_.dll","bridge/LICENSE.txt"};
+    // The installed launcher dispatches the small, strict maintenance commands
+    // itself. Setup is a separate download, not a redundant installed executable.
+    internal static readonly string[] PayloadNames={"BVE6互換ランチャー.exe","LauncherStarter.exe","Uninstall.exe","launcher.ico","LICENSE.txt","README.txt","THIRD_PARTY_NOTICES.txt","bridge/Bve5VehicleCompatibility.exe","bridge/Bve5VehicleCompatibility_.dll","bridge/LICENSE.txt"};
+    // Pre-b16 installers contained a separate update executable. Old versions
+    // may be cleaned only with their exact, SHA-indexed known layout.
+    private static readonly string[] LegacyPayloadNames={"BVE6互換ランチャー.exe","導入・更新.exe","LauncherStarter.exe","Uninstall.exe","launcher.ico","LICENSE.txt","README.txt","THIRD_PARTY_NOTICES.txt","bridge/Bve5VehicleCompatibility.exe","bridge/Bve5VehicleCompatibility_.dll","bridge/LICENSE.txt"};
+    private static string[] CleanupPayloadSet(Index index){
+        if(index==null||index.files==null)return null;
+        foreach(string[] candidate in new[]{PayloadNames,LegacyPayloadNames}){
+            if(index.files.Count==candidate.Length&&
+               candidate.All(x=>index.files.ContainsKey(x)))return candidate;
+        }
+        return null;
+    }
     internal sealed class Manifest {public string version{get;set;} public string displayVersion{get;set;} public string url{get;set;} public string sha256{get;set;} public string notes{get;set;}}
     internal sealed class Index {public string version{get;set;} public string displayVersion{get;set;} public Dictionary<string,string> files{get;set;}}
     internal static string Hash(string file){using(var sha=SHA256.Create())using(var input=File.OpenRead(file))return BitConverter.ToString(sha.ComputeHash(input)).Replace("-","");}
@@ -57,7 +70,7 @@ internal static class InstallEngine {
                 var index=new JavaScriptSerializer().Deserialize<Index>(File.ReadAllText(Path.Combine(stage,"package-index.json")));
                 if(index==null||index.version!=manifest.version||index.displayVersion!=manifest.displayVersion||index.files==null||index.files.Count!=PayloadNames.Length)throw new InvalidDataException("パッケージ内部の版が一致しません。");
                 foreach(string name in PayloadNames){string hash;if(!index.files.TryGetValue(name,out hash)||!Hash(Path.Combine(stage,name)).Equals(hash,StringComparison.OrdinalIgnoreCase))throw new InvalidDataException("内部ファイルの確認値が一致しません: "+name);}
-                foreach(string name in new[]{"BVE6互換ランチャー.exe","導入・更新.exe","LauncherStarter.exe","Uninstall.exe"})if(FileVersionInfo.GetVersionInfo(Path.Combine(stage,name)).FileVersion!=manifest.version||FileVersionInfo.GetVersionInfo(Path.Combine(stage,name)).ProductVersion!=manifest.displayVersion)throw new InvalidDataException("実行ファイルと更新情報の版が一致しません: "+name);
+                foreach(string name in new[]{"BVE6互換ランチャー.exe","LauncherStarter.exe","Uninstall.exe"})if(FileVersionInfo.GetVersionInfo(Path.Combine(stage,name)).FileVersion!=manifest.version||FileVersionInfo.GetVersionInfo(Path.Combine(stage,name)).ProductVersion!=manifest.displayVersion)throw new InvalidDataException("実行ファイルと更新情報の版が一致しません: "+name);
                 if(oldStarter!=null&&(oldHash==null||!Hash(starter).Equals(System.Text.Encoding.UTF8.GetString(oldHash).Trim('\uFEFF',' ','\r','\n'),StringComparison.OrdinalIgnoreCase)))throw new InvalidDataException("既存の起動用ファイルを確認できません。変更を中止しました。");
                 // Keep any earlier a4 candidate intact; activate the validated package by content identity.
                 string final=Path.Combine(versions,manifest.version+"-"+manifest.sha256.Substring(0,12));RejectLinks(final);
@@ -98,15 +111,16 @@ internal static class InstallEngine {
                     if(!File.Exists(marker)||File.ReadAllText(marker)!="installed"||!File.Exists(indexFile)||new FileInfo(indexFile).Length>262144)continue;
                     RejectLinks(marker);RejectLinks(indexFile);if(Directory.Exists(bridge))RejectLinks(bridge);
                     var index=new JavaScriptSerializer().Deserialize<Index>(File.ReadAllText(indexFile));
-                    if(index==null||index.version!=version.ToString()||index.files==null||index.files.Count!=PayloadNames.Length||PayloadNames.Any(x=>!index.files.ContainsKey(x)))continue;
-                    var allowed=new HashSet<string>(PayloadNames.Where(x=>!x.Contains("/")),StringComparer.OrdinalIgnoreCase);allowed.Add("installed.marker");allowed.Add("package-index.json");
+                    string[] payloads=CleanupPayloadSet(index);
+                    if(index==null||index.version!=version.ToString()||payloads==null)continue;
+                    var allowed=new HashSet<string>(payloads.Where(x=>!x.Contains("/")),StringComparer.OrdinalIgnoreCase);allowed.Add("installed.marker");allowed.Add("package-index.json");
                     if(Directory.GetFiles(dir).Any(x=>!allowed.Contains(Path.GetFileName(x)))||Directory.GetDirectories(dir).Any(x=>!String.Equals(Path.GetFileName(x),"bridge",StringComparison.OrdinalIgnoreCase)))continue;
-                    var bridgeAllowed=new HashSet<string>(PayloadNames.Where(x=>x.StartsWith("bridge/")).Select(x=>x.Substring(7)),StringComparer.OrdinalIgnoreCase);
+                    var bridgeAllowed=new HashSet<string>(payloads.Where(x=>x.StartsWith("bridge/")).Select(x=>x.Substring(7)),StringComparer.OrdinalIgnoreCase);
                     if(Directory.Exists(bridge)&&(Directory.GetDirectories(bridge).Length!=0||Directory.GetFiles(bridge).Any(x=>!bridgeAllowed.Contains(Path.GetFileName(x)))))continue;
-                    bool valid=true;foreach(string item in PayloadNames){string file=Path.Combine(dir,item.Replace('/',Path.DirectorySeparatorChar));if(!File.Exists(file))continue;RejectLinks(file);string expected=index.files[item];if(String.IsNullOrEmpty(expected)||!Hash(file).Equals(expected,StringComparison.OrdinalIgnoreCase)){valid=false;break;}}
+                    bool valid=true;foreach(string item in payloads){string file=Path.Combine(dir,item.Replace('/',Path.DirectorySeparatorChar));if(!File.Exists(file))continue;RejectLinks(file);string expected=index.files[item];if(String.IsNullOrEmpty(expected)||!Hash(file).Equals(expected,StringComparison.OrdinalIgnoreCase)){valid=false;break;}}
                     if(!valid)continue;
-                    foreach(string item in PayloadNames){string file=Path.Combine(dir,item.Replace('/',Path.DirectorySeparatorChar));try{if(File.Exists(file))File.Delete(file);}catch(IOException){remaining=true;}catch(UnauthorizedAccessException){remaining=true;}}
-                    if(PayloadNames.Any(item=>File.Exists(Path.Combine(dir,item.Replace('/',Path.DirectorySeparatorChar))))){remaining=true;continue;}
+                    foreach(string item in payloads){string file=Path.Combine(dir,item.Replace('/',Path.DirectorySeparatorChar));try{if(File.Exists(file))File.Delete(file);}catch(IOException){remaining=true;}catch(UnauthorizedAccessException){remaining=true;}}
+                    if(payloads.Any(item=>File.Exists(Path.Combine(dir,item.Replace('/',Path.DirectorySeparatorChar))))){remaining=true;continue;}
                     if(Directory.Exists(bridge)&&Directory.GetFileSystemEntries(bridge).Length==0)Directory.Delete(bridge);
                     File.Delete(indexFile);File.Delete(marker);if(Directory.GetFileSystemEntries(dir).Length==0)Directory.Delete(dir);
                 }catch(IOException){remaining=true;}catch(UnauthorizedAccessException){remaining=true;}catch(InvalidDataException){continue;}catch(ArgumentException){continue;}

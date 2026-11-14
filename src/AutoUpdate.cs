@@ -45,7 +45,7 @@ internal static class AutoUpdate {
             bool launchAfterUpdate;
             if(!UpdatePrompt.Show(promptOwner,update,root!=null,out launchAfterUpdate))return;
             if(root==null){Process.Start(new ProcessStartInfo(Release.DistributionUrl){UseShellExecute=true});return;}
-            string installer=Path.Combine(AppDomain.CurrentDomain.BaseDirectory,"導入・更新.exe");
+            string installer=Application.ExecutablePath;
             if(!File.Exists(installer)){MessageBox.Show(promptOwner,"更新用ファイルが見つかりません。");return;}
             var process=Process.Start(new ProcessStartInfo(installer,launchAfterUpdate?"--apply --launch":"--apply --no-launch"){UseShellExecute=true});
             if(process==null)throw new IOException("更新用ファイルを起動できませんでした。");

@@ -6,7 +6,8 @@ using System.Windows.Forms;
 
 // Setup and updater share an explicit, version-pinned path. No encoded commands.
 internal static class Downloader {
-    [STAThread] static int Main(string[] args){
+    [STAThread] static int Main(string[] args){return Run(args);}
+    internal static int Run(string[] args){
         Application.EnableVisualStyles();
         try{
             if(args.Length==3&&args[0]=="--set-bveex"){
@@ -51,11 +52,13 @@ internal static class Downloader {
     }
     static void DownloadAndInstall(string root,bool update){
         var manifest=InstallEngine.ParseManifest(SecureHttp.Text(update?Release.UpdateUrl:Release.PackageManifestUrl),new Version(Release.Number),update?null:Release.Number);
-        string previous=InstallEngine.InstalledVersion(root);
+        // Keep the previous complete version as an explicit rollback option.
+        // Older files are never deleted automatically during an upgrade.
         string work=Path.Combine(Path.GetTempPath(),"BVE6Launcher-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(work);
         try{
             string zip=Path.Combine(work,"package.zip");SecureHttp.File(manifest.url,zip);string installed=InstallEngine.Install(root,zip,manifest,null);
-            if(previous!=null){try{string helper=Path.Combine(Path.GetDirectoryName(installed),"導入・更新.exe");var cleanup=Process.Start(new ProcessStartInfo(helper,"--cleanup-root \""+root+"\""){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden,WorkingDirectory=Path.GetDirectoryName(installed)});if(cleanup==null)throw new IOException("旧版の整理を開始できませんでした。");cleanup.Dispose();}catch(Exception e){MessageBox.Show("更新は完了しましたが、旧版の自動整理を開始できませんでした。\n"+e.Message,"更新完了",MessageBoxButtons.OK,MessageBoxIcon.Warning);}}
+            // CleanupOld remains available only through the launcher's
+            // explicitly requested maintenance action.
             try{InstallShell.Shortcut(Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms),root);InstallShell.Register(root);}catch(Exception e){MessageBox.Show("本体の導入は完了しましたが、Windowsへの登録を完了できませんでした。\n"+e.Message+"\n起動場所: "+Path.Combine(root,"LauncherStarter.exe"),"導入完了");}
         }finally{if(Directory.Exists(work)){InstallEngine.RejectLinks(work);Directory.Delete(work,true);}}
     }

@@ -1,0 +1,7 @@
+{
+    "version":  "0.2.9.27",
+    "displayVersion":  "0.29b16",
+    "url":  "https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29b16/BVE6Launcher-package.zip",
+    "sha256":  "6F6610F40AB61CFE8158E9FAD6C49638459121D93631123D02BC0D77B8AE2EC5",
+    "notes":  "0.29b16：導入用の重複する更新EXEを廃止し、検証済みの本体で保守処理を行う構造に変更。以前の版は自動削除しません。"
+}
