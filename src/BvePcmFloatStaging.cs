@@ -25,7 +25,12 @@ internal static class BvePcmFloatStaging {
         internal uint Frames;
         internal long OutputLength;
         internal long SaurChunkOffset=-1;
+        internal readonly List<PreservedChunk> Metadata=new List<PreservedChunk>();
         internal string SourceSha256;
+    }
+    sealed class PreservedChunk {
+        internal long Offset;
+        internal int ByteLength;
     }
     static string FourCC(BinaryReader r){
         byte[] code=r.ReadBytes(4);
@@ -59,7 +64,7 @@ internal static class BvePcmFloatStaging {
             if(FourCC(input)!="WAVE" || (long)riffSize+8!=stream.Length)
                 throw new InvalidDataException("WAVのサイズ/形式が不正です: "+file);
             var info=new WavInfo();
-            bool fmt=false,data=false;
+            bool fmt=false,data=false,infoList=false;
             while(stream.Position+8<=stream.Length){
                 cancellation.ThrowIfCancellationRequested();
                 string id=FourCC(input);
@@ -117,6 +122,23 @@ internal static class BvePcmFloatStaging {
                        metadata.Skip(version.Length).Any(b=>b!=0))
                         throw new NotSupportedException("未確認のSAURバージョン情報です: "+file);
                     info.SaurChunkOffset=start-8;
+                    info.Metadata.Add(new PreservedChunk{Offset=start-8,
+                        ByteLength=checked((int)(next-(start-8)))});
+                }else if(id=="LIST"){
+                    // INFO/ISFT identifies the software that produced the
+                    // original WAV. Preserve this passive metadata verbatim.
+                    // Unknown LIST forms/subchunks still fail closed, since
+                    // they could describe looping/playback behavior.
+                    if(!data || infoList || size<12 || size>65536 ||
+                       FourCC(input)!="INFO" || FourCC(input)!="ISFT")
+                        throw new NotSupportedException("未確認のLISTメタデータです: "+file);
+                    uint textLength=input.ReadUInt32();
+                    if(textLength<1 || textLength>1024 ||
+                       stream.Position+(long)textLength+(textLength&1)!=start+size)
+                        throw new NotSupportedException("LIST/INFOの境界が不正です: "+file);
+                    infoList=true;
+                    info.Metadata.Add(new PreservedChunk{Offset=start-8,
+                        ByteLength=checked((int)(next-(start-8)))});
                 }else {
                     // Dropping unknown chunks (including loop metadata) can
                     // change playback semantics. Reject rather than guess.
@@ -130,8 +152,8 @@ internal static class BvePcmFloatStaging {
             info.Frames=info.DataLength/info.BlockAlign;
             // 12 RIFF + 24 fmt + 12 fact + 8 data + N float bytes.
             info.OutputLength=56L+(long)info.Frames*info.Channels*4;
-            // Eight chunk-header bytes plus 32 Wavosaur metadata bytes.
-            if(info.SaurChunkOffset>=0)info.OutputLength+=40;
+            foreach(var metadata in info.Metadata)
+                info.OutputLength+=metadata.ByteLength;
             if(info.OutputLength>uint.MaxValue || info.OutputLength>MaxSourceBytes)
                 throw new InvalidDataException("変換後のWAVがサイズ上限を超えます: "+file);
             info.SourceSha256=Sha256(stream,cancellation);
@@ -190,14 +212,13 @@ internal static class BvePcmFloatStaging {
                 }
                 writer.Write(value);
             }
-            if(info.SaurChunkOffset>=0){
-                inputStream.Position=info.SaurChunkOffset;
-                byte[] saur=reader.ReadBytes(40);
-                if(saur.Length!=40 ||
-                   Encoding.ASCII.GetString(saur,0,4)!="SAUR" ||
-                   BitConverter.ToUInt32(saur,4)!=32)
-                    throw new InvalidDataException("SAURメタデータが検査後に変更されました: "+source);
-                writer.Write(saur);
+            foreach(var chunk in info.Metadata.OrderBy(x=>x.Offset)){
+                cancel.ThrowIfCancellationRequested();
+                inputStream.Position=chunk.Offset;
+                byte[] content=reader.ReadBytes(chunk.ByteLength);
+                if(content.Length!=chunk.ByteLength)
+                    throw new InvalidDataException("WAVの追加情報が検査後に変更されました: "+source);
+                writer.Write(content);
             }
             writer.Flush();
             if(outputStream.Length!=info.OutputLength)
@@ -229,9 +250,24 @@ internal static class BvePcmFloatStaging {
     }
     static void WriteNewLines(string path,IEnumerable<string> lines){
         using(var file=new FileStream(path,FileMode.CreateNew,FileAccess.Write,FileShare.None))
-        using(var writer=new StreamWriter(file,Encoding.GetEncoding(932))){
+        using(var writer=new StreamWriter(file,Encoding.GetEncoding(932,
+            EncoderFallback.ExceptionFallback,DecoderFallback.ExceptionFallback))){
             foreach(string line in lines)writer.WriteLine(line);
         }
+    }
+    // Every generated CP932 file must advertise CP932. Without the suffix,
+    // BVE6 assumes UTF-8 and Japanese characters in the absolute working
+    // directory become mojibake (and sound.float32.txt cannot be located).
+    internal static string ExplicitShiftJisHeader(string header,string prefix){
+        if(String.IsNullOrWhiteSpace(header))
+            throw new InvalidDataException("生成ファイルのヘッダーが空です。");
+        string raw=header.TrimStart('\uFEFF').Trim();
+        int colon=raw.IndexOf(':');
+        string format=(colon<0?raw:raw.Substring(0,colon)).Trim();
+        if(!format.StartsWith(prefix,StringComparison.OrdinalIgnoreCase) ||
+           format.Length<=prefix.Length || !Char.IsWhiteSpace(format[prefix.Length]))
+            throw new InvalidDataException("未対応の生成ファイルヘッダーです: "+header);
+        return format+":shift_jis";
     }
     static string[] ReplaceOne(string[] lines,string key,string target){
         int matched=0;
@@ -294,6 +330,7 @@ internal static class BvePcmFloatStaging {
                 ? soundLines[i]
                 : p.Key+" = "+Full(Path.GetDirectoryName(originalSound),p.Value);
         }
+        resolvedSound[0]=ExplicitShiftJisHeader(soundLines[0],"BveTs Vehicle Sound");
         // A fresh sibling run keeps the normal-mode prepared scenario intact
         // while producing a consistent scenario -> vehicle -> Sound chain.
         string run=Path.Combine(root,"run-"+DateTime.Now.ToString("yyyyMMdd-HHmmss")+
@@ -319,6 +356,7 @@ internal static class BvePcmFloatStaging {
                 resolvedVehicle[i]=p.Key+" = "+source;
             }else resolvedVehicle[i]=vehicleLines[i];
         }
+        resolvedVehicle[0]=ExplicitShiftJisHeader(vehicleLines[0],"BveTs Vehicle");
         // Retain BveEX sidecar selection when a native vehicle supplies it.
         var configs=new[]{
             new[]{Path.Combine(vehicleDir,"VehiclePluginUsing.xml"),
@@ -346,7 +384,9 @@ internal static class BvePcmFloatStaging {
         WriteNewLines(copiedSound,resolvedSound);
         WriteNewLines(copiedVehicle,resolvedVehicle);
         string copiedScenario=Path.Combine(run,"scenario.txt");
-        WriteNewLines(copiedScenario,ReplaceOne(scenarioLines,"Vehicle",copiedVehicle));
+        var scenarioCopy=ReplaceOne(scenarioLines,"Vehicle",copiedVehicle);
+        scenarioCopy[0]=ExplicitShiftJisHeader(scenarioLines[0],"BveTs Scenario");
+        WriteNewLines(copiedScenario,scenarioCopy);
         return StagePreparedScenario(copiedScenario,cancel);
     }
     internal static Result StagePreparedScenario(string preparedScenario,CancellationToken cancel){
@@ -410,9 +450,14 @@ internal static class BvePcmFloatStaging {
         string newScenario=Path.Combine(run,"scenario.float32.txt");
         // CreateNew never overwrites prepared files, hardlinks, or a prior
         // result, even if a test is repeated or unexpectedly interrupted.
+        replacements[0]=ExplicitShiftJisHeader(lines[0],"BveTs Vehicle Sound");
+        var floatVehicle=ReplaceOne(vehicleLines,"Sound",newSound);
+        floatVehicle[0]=ExplicitShiftJisHeader(vehicleLines[0],"BveTs Vehicle");
+        var floatScenario=ReplaceOne(scenarioLines,"Vehicle",newVehicle);
+        floatScenario[0]=ExplicitShiftJisHeader(scenarioLines[0],"BveTs Scenario");
         WriteNewLines(newSound,replacements);
-        WriteNewLines(newVehicle,ReplaceOne(vehicleLines,"Sound",newSound));
-        WriteNewLines(newScenario,ReplaceOne(scenarioLines,"Vehicle",newVehicle));
+        WriteNewLines(newVehicle,floatVehicle);
+        WriteNewLines(newScenario,floatScenario);
         // BveEX can also use filename-specific plugin configuration; keep
         // the same plugin settings for the new private vehicle basename.
         string oldConfig=Path.Combine(run,"vehicle.VehiclePluginUsing.xml");

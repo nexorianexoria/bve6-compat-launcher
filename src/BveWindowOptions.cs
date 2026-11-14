@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -64,6 +65,60 @@ internal static class BveWindowOptions {
         int x,int y,int width,int height,uint flags);
     [DllImport("user32.dll",EntryPoint="GetWindowLongPtrW",SetLastError=true)]
     private static extern IntPtr GetWindowLongPtr(IntPtr handle,int index);
+    private delegate bool WindowEnumerator(IntPtr handle,IntPtr unused);
+    [DllImport("user32.dll")]
+    private static extern bool EnumWindows(WindowEnumerator callback,IntPtr unused);
+    [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr handle,out uint pid);
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr handle);
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowEnabled(IntPtr handle);
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetWindow(IntPtr handle,uint command);
+    [DllImport("user32.dll",CharSet=CharSet.Unicode)]
+    private static extern int GetWindowText(IntPtr handle,StringBuilder text,int maximum);
+    [DllImport("user32.dll",CharSet=CharSet.Unicode)]
+    private static extern int GetClassName(IntPtr handle,StringBuilder text,int maximum);
+    internal static bool ShouldRaiseBveDialog(bool sameProcess,bool visible,
+        bool isMainOrPicker,bool ownedByBve,bool mainDisabled,
+        bool errorTitle,bool standardDialogClass){
+        return sameProcess && visible && !isMainOrPicker &&
+            ((ownedByBve && (errorTitle || standardDialogClass)) ||
+             (mainDisabled && errorTitle));
+    }
+    internal static List<IntPtr> FindModalDialogs(int pid,IEnumerable<IntPtr> mainWindows,
+        IEnumerable<IntPtr> excluded){
+        var mains=new HashSet<IntPtr>(mainWindows);
+        var allKnown=new HashSet<IntPtr>(excluded);
+        if(mains.Count==0)return new List<IntPtr>();
+        bool disabled=mains.Any(h=>!IsWindowEnabled(h));
+        var dialogs=new List<IntPtr>();
+        EnumWindows((handle,unused)=>{
+            uint ownerPid;
+            GetWindowThreadProcessId(handle,out ownerPid);
+            if(ownerPid!=(uint)pid || !IsWindowVisible(handle) || allKnown.Contains(handle))
+                return true;
+            var name=new StringBuilder(256);
+            var cls=new StringBuilder(128);
+            GetWindowText(handle,name,name.Capacity);
+            GetClassName(handle,cls,cls.Capacity);
+            string title=name.ToString();
+            bool errorTitle=title.IndexOf("エラー",StringComparison.OrdinalIgnoreCase)>=0 ||
+                title.IndexOf("警告",StringComparison.OrdinalIgnoreCase)>=0 ||
+                title.IndexOf("error",StringComparison.OrdinalIgnoreCase)>=0;
+            bool owned=false;
+            IntPtr parent=GetWindow(handle,4); // GW_OWNER
+            for(int depth=0;parent!=IntPtr.Zero && depth<12;depth++){
+                if(mains.Contains(parent)){owned=true;break;}
+                parent=GetWindow(parent,4);
+            }
+            if(ShouldRaiseBveDialog(true,true,false,owned,disabled,
+                errorTitle,cls.ToString()=="#32770"))dialogs.Add(handle);
+            return true;
+        },IntPtr.Zero);
+        return dialogs;
+    }
     internal static bool IsTopmost(IntPtr handle){
         return handle!=IntPtr.Zero && (GetWindowLongPtr(handle,-20).ToInt64() & 8)!=0;
     }
@@ -100,6 +155,22 @@ internal static class BveWindowOptions {
                                         "pid="+pid+" window="+(target.ScenarioPicker?"scenario-picker":"main"));
                                 }else Diagnostics.Write("BVE_TOPMOST","SetWindowPos failed: "+
                                     Marshal.GetLastWin32Error());
+                            }
+                            // BVE uses separate error and warning windows.
+                            // Pinning only its main window can put a modal
+                            // error *behind* the game. Raise only visible,
+                            // same-process modal candidates, AFTER the main
+                            // window. Do not touch other apps or plugin HUDs.
+                            var dialogs=FindModalDialogs(pid,
+                                windows.Select(w=>w.Handle),
+                                windows.Select(w=>w.Handle));
+                            foreach(IntPtr dialog in dialogs){
+                                if(SetTopmost(dialog,true))
+                                    Diagnostics.Write("BVE_MODAL_FOREGROUND",
+                                        "pid="+pid+" hwnd="+dialog.ToInt64()+
+                                        " errorDialogAboveGame=true");
+                                else Diagnostics.Write("BVE_MODAL_FOREGROUND",
+                                    "SetWindowPos error="+Marshal.GetLastWin32Error());
                             }
                         }
                         Thread.Sleep(1000);

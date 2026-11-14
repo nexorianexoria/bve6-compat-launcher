@@ -1,6 +1,6 @@
 internal static class Release {
-    public const string Display="0.29b18";
-    public const string Number="0.2.9.29";
+    public const string Display="0.29b19";
+    public const string Number="0.2.9.30";
     public const string Repository="nexorianexoria/bve6-compat-launcher";
     public const string DistributionUrl="https://github.com/"+Repository+"/releases/latest";
     public const string HistoryUrl="https://github.com/"+Repository+"/releases";

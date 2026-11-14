@@ -1,6 +1,8 @@
 # BVE5 Vehicle Compatibility for BVE6 / BVE6互換ランチャー
 
-**安定版：Ver.0.29b14／通常起動の音声維持を修正した試験版：Ver.0.29b18**
+**安定版：Ver.0.29b14／車両音声・エラー表示を修正した試験版：Ver.0.29b19**
+
+**[Ver.0.29b19 修正版インストーラー](https://github.com/nexorianexoria/bve6-compat-launcher/releases/tag/v0.29b19)** — 京成3500形で日本語の一時作業フォルダーを参照すると音声ファイルが見つからない問題、都営5300形のWAVに含まれる`LIST/INFO/ISFT`情報で変換が止まる問題、およびBVEのエラーダイアログがゲーム画面の後ろに隠れる問題への対策です。バックグラウンド音声設定を保ち、**元の車両・WAV・ATS・設定は変更しません**。詳細は[検証結果・未確認事項](RELEASE_NOTES_0.29b19_PREVIEW.md)を参照してください。
 
 **[Ver.0.29b18 修正版インストーラー](https://github.com/nexorianexoria/bve6-compat-launcher/releases/tag/v0.29b18)** — BVE6通常起動で、バックグラウンド音声を標準DirectSoundへ切り替えず、検証済みの整数PCMだけをランチャー専用の作業コピーで変換します。**元の車両・音声・ATSと保存設定は変更しません。** 変換に失敗した場合は、標準音声へ勝手に切り替えず起動を中止します。詳細は[検証結果](RELEASE_NOTES_0.29b18_PREVIEW.md)を参照してください。
 
@@ -17,6 +19,10 @@
 BVE Trainsim 5/6向けの路線・車両を選び、BVE5またはBVE6を起動する非公式ランチャーです。BVE6で従来の32ビット版ATSプラグインを利用するための互換機能を搭載しています。
 
 ## ダウンロード
+
+**試験版の最新版：** [Ver.0.29b19 インストーラー・ポータブルZIP](https://github.com/nexorianexoria/bve6-compat-launcher/releases/tag/v0.29b19)。GitHubのAssetsからダウンロードしてください。正式な安定版はVer.0.29b14です。
+
+以下は過去に公開した試験版の記録です。
 
 **[Ver.0.29b15 ポータブルZIP（先行公開・安全性未確認）](https://github.com/nexorianexoria/bve6-compat-launcher/raw/refs/heads/main/downloads/0.29b15/BVE6Launcher-0.29b15-Portable.zip)**
 

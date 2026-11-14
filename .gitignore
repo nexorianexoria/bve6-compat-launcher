@@ -38,3 +38,5 @@ src/bridge/**/x64/
 oneclick-scenario.local.txt
 dist-b13-release/
 dist-b14-release/
+dist-b19-release/
+benchmarks/results/

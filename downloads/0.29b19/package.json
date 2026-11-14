@@ -1,0 +1,7 @@
+{
+    "version":  "0.2.9.30",
+    "displayVersion":  "0.29b19",
+    "url":  "https://raw.githubusercontent.com/nexorianexoria/bve6-compat-launcher/main/downloads/0.29b19/BVE6Launcher-package.zip",
+    "sha256":  "2AA0FB045F1A10CAE76E83B3E99A808A23A7873F245259B4FFBDF66883E2096C",
+    "notes":  "0.29b19：京成3500形の音声参照パス修正、都営5300形のLIST/INFO/ISFT情報保持、BVEエラーダイアログ表示の改善。元データは変更しません。"
+}
