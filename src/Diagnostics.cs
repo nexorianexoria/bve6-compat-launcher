@@ -6,6 +6,8 @@ using System.Text.RegularExpressions;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
+using System.Threading;
+using System.Threading.Tasks;
 
 internal static class Diagnostics {
     public const string Version=Release.Display;
@@ -35,7 +37,7 @@ internal static class Diagnostics {
             var list=new ListBox{Dock=DockStyle.Fill,HorizontalScrollbar=true};history.Controls.Add(list);
             var text=new TextBox{Dock=DockStyle.Fill,Multiline=true,ReadOnly=true,ScrollBars=ScrollBars.Both,WordWrap=false,Font=new Font("Consolas",10)};split.Panel2.Controls.Add(text);
             var bar=new FlowLayoutPanel{Dock=DockStyle.Fill};layout.Controls.Add(bar);
-            var refresh=new Button{Text="更新",AutoSize=true};var export=new Button{Text="診断レポートを保存",AutoSize=true};var folder=new Button{Text="記録フォルダを開く",AutoSize=true};bar.Controls.Add(refresh);bar.Controls.Add(export);bar.Controls.Add(folder);
+            var refresh=new Button{Text="更新",AutoSize=true};var export=new Button{Text="診断レポートを保存",AutoSize=true};var folder=new Button{Text="記録フォルダを開く",AutoSize=true};var dsoal=new Button{Text="DSOALログを解析",AutoSize=true};bar.Controls.Add(refresh);bar.Controls.Add(export);bar.Controls.Add(folder);bar.Controls.Add(dsoal);
             string latestPath=null,selectedPath=null;bool updating=false;
             Action<string> show=path=>{selectedPath=path;try{text.Text=path==null?"まだログがありません。":Redact(Tail(path));}catch(Exception error){text.Text=error.Message;}};
             Action update=()=>{
@@ -53,6 +55,67 @@ internal static class Diagnostics {
             list.SelectedIndexChanged+=(s,e)=>{if(updating)return;var entry=list.SelectedItem as LogEntry;if(entry!=null)show(entry.Path);};
             latest.Click+=(s,e)=>{update();list.ClearSelected();show(latestPath);};refresh.Click+=(s,e)=>update();
             folder.Click+=(s,e)=>System.Diagnostics.Process.Start("explorer.exe",Program.Data);
+            CancellationTokenSource logAnalysisCancellation=null;
+            var logWatch=new System.Windows.Forms.Timer{Interval=500};
+            logWatch.Tick+=(sender,args)=>{
+                if(logAnalysisCancellation!=null &&
+                   System.Diagnostics.Process.GetProcessesByName("BveTs").Length>0)
+                    logAnalysisCancellation.Cancel();
+            };
+            f.FormClosing+=(sender,args)=>{if(logAnalysisCancellation!=null)logAnalysisCancellation.Cancel();};
+            dsoal.Click+=async (s,e)=>{
+                if(logAnalysisCancellation!=null){logAnalysisCancellation.Cancel();return;}
+                if(System.Diagnostics.Process.GetProcessesByName("BveTs").Length>0){
+                    MessageBox.Show(f,"BVE運転中はディスク負荷を避けるためログを解析しません。","DSOALログ診断");return;
+                }
+                string selectedLog;
+                using(var picker=new OpenFileDialog{
+                    Title="保存済みのDSOALログを選択してください",Filter="DSOALログ (*.log)|*.log|すべてのファイル (*.*)|*.*",
+                    FileName="dsoal-test.log",RestoreDirectory=true,CheckFileExists=true}){
+                    string audioDirectory=BveBackgroundAudio.DefaultRunRoot();
+                    if(!Directory.Exists(audioDirectory))
+                        audioDirectory=Path.Combine(Program.Data,"background-audio-test");
+                    if(Directory.Exists(audioDirectory))picker.InitialDirectory=audioDirectory;
+                    if(picker.ShowDialog(f)!=DialogResult.OK)return;
+                    selectedLog=picker.FileName;
+                }
+                // The file picker can be open while another process starts BVE.
+                if(System.Diagnostics.Process.GetProcessesByName("BveTs").Length>0){
+                    MessageBox.Show(f,"BVEの運転が始まったためログ診断を中止しました。","DSOALログ診断");return;
+                }
+                var cancellation=new CancellationTokenSource();
+                logAnalysisCancellation=cancellation;
+                dsoal.Text="解析を中止";
+                logWatch.Start();
+                try {
+                    text.Text="保存済みDSOALログを読み取り専用で確認しています…";
+                    var result=await Task.Run(()=>BveDsoalSavedLog.Inspect(selectedLog,cancellation.Token),cancellation.Token);
+                    cancellation.Token.ThrowIfCancellationRequested();
+                    if(f.IsDisposed)return;
+                    if(System.Diagnostics.Process.GetProcessesByName("BveTs").Length>0){
+                        text.Text="BVEの運転開始を検出したためログ診断を中止しました。";
+                        return;
+                    }
+                    string report=BveDsoalSavedLog.Format(result);
+                    using(var reportForm=new Form{Text="DSOALログ診断（読み取り専用）",Size=new Size(900,670),MinimumSize=new Size(540,380),StartPosition=FormStartPosition.CenterParent,Font=f.Font}){
+                        var view=new TextBox{Text=report,Dock=DockStyle.Fill,Multiline=true,ReadOnly=true,WordWrap=false,ScrollBars=ScrollBars.Both,Font=new Font("Yu Gothic UI",10)};
+                        var actions=new FlowLayoutPanel{Dock=DockStyle.Bottom,Height=52,FlowDirection=FlowDirection.RightToLeft,Padding=new Padding(8)};
+                        var done=new Button{Text="閉じる",Width=100,Height=32,DialogResult=DialogResult.OK};
+                        var copy=new Button{Text="結果をコピー",Width=140,Height=32};
+                        copy.Click+=(sender,args)=>{try{Clipboard.SetText(report);}catch(Exception ex){MessageBox.Show(reportForm,"コピーできませんでした。"+ex.Message);}};
+                        actions.Controls.Add(done);actions.Controls.Add(copy);
+                        reportForm.Controls.Add(view);reportForm.Controls.Add(actions);reportForm.AcceptButton=done;
+                        reportForm.ShowDialog(f);
+                    }
+                }catch(OperationCanceledException){if(!f.IsDisposed)text.Text="DSOALログの診断を中止しました。";}
+                catch(Exception ex){if(!f.IsDisposed){text.Text="ログの診断に失敗しました。"+ex.Message;Write("DSOAL_LOG_GUI_ERROR",ex.GetType().Name);}}
+                finally {
+                    logWatch.Stop();
+                    logAnalysisCancellation=null;
+                    cancellation.Dispose();
+                    if(!f.IsDisposed)dsoal.Text="DSOALログを解析";
+                }
+            };
             export.Click+=(s,e)=>{using(var picker=new SaveFileDialog{Filter="テキストファイル|*.txt",FileName="BVE6互換ランチャー_診断_"+DateTime.Now.ToString("yyyyMMdd-HHmmss")+".txt"})if(picker.ShowDialog(f)==DialogResult.OK){try{File.WriteAllText(picker.FileName,Report(selectedPath),Encoding.UTF8);MessageBox.Show(f,"診断レポートを保存しました。送信前に内容を確認してください。","保存完了");}catch(Exception error){MessageBox.Show(f,error.Message,"保存できませんでした");}}};
             update();f.Shown+=(s,e)=>split.SplitterDistance=Math.Min(360,split.Width/3);f.ShowDialog(owner);
         }

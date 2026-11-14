@@ -84,6 +84,18 @@ internal static class Program {
             start.EnvironmentVariables["BVE5COMPAT_WORKDIR"]=ready.Work;
             start.EnvironmentVariables["BVE5COMPAT_PROFILE"]="1";
         }
+        if(BveWindowOptions.Read(6).BackgroundAudio) {
+            var audioCheck=BveDsoalCompatibility.InspectScenario(ready.Scenario);
+            Diagnostics.Write("DSOAL_HEADLESS_PREFLIGHT",
+                "known="+audioCheck.IsKnown+
+                " references="+audioCheck.TotalReferences+
+                " unique="+audioCheck.UniqueWavFiles+
+                " unsupported="+audioCheck.UnsupportedReferences+
+                " unsupportedUnique="+audioCheck.UnsupportedUniqueFiles+
+                " reason="+(audioCheck.UnknownReason??""));
+            // No prompt in headless mode: reject before Process.Start.
+            BveDsoalCompatibility.RequireSupportedForHeadlessLaunch(audioCheck);
+        }
         using(var process=BveBackgroundAudio.Start(start,6)) {
             if(process==null)throw new IOException("Failed to start BVE6.");
             Diagnostics.Write("BVE_STARTED","pid="+process.Id+" exe="+start.FileName);
@@ -255,18 +267,24 @@ internal static class Program {
 }
 
 internal sealed class Launcher:ModernWindow {
- TextBox root=new TextBox(),search=new TextBox(),vehicleSearch=new TextBox(),exe=new TextBox(),exe5=new TextBox();CatalogView scenarios=new CatalogView(),vehicles=new CatalogView();DetailTextView scenarioInfo=new DetailTextView(),vehicleInfo=new DetailTextView();PictureBox scenarioPicture=new PictureBox(),vehiclePicture=new PictureBox();Label status=new Label(),scenarioCount=new Label(),vehicleCount=new Label();ProgressBar loadingBar=new ProgressBar();TableLayoutPanel launchLayout;ModernButton detailSelectionButton;Button[] launchButtons=new Button[3];List<CatalogItem> sc=new List<CatalogItem>(),vc=new List<CatalogItem>();int scanGeneration;CancellationTokenSource scanCancellation;bool filtering;int activeBveProcesses;bool gameQuietMode,pendingScanAfterGame;readonly BveGameplayActivity bveActivity=new BveGameplayActivity();
- public Launcher(bool startServices=true){Icon=new Icon(Path.Combine(Program.Home,"launcher.ico"));Text="BVE 起動ランチャー Ver."+Release.Display;Size=new Size(1600,990);MinimumSize=new Size(960,680);Font=new Font("Yu Gothic UI",10);StartPosition=FormStartPosition.CenterScreen;
+  TextBox root=new TextBox(),search=new TextBox(),vehicleSearch=new TextBox(),exe=new TextBox(),exe5=new TextBox();CatalogView scenarios=new CatalogView(),vehicles=new CatalogView();DetailTextView scenarioInfo=new DetailTextView(),vehicleInfo=new DetailTextView();PictureBox scenarioPicture=new PictureBox(),vehiclePicture=new PictureBox();Label status=new Label(),scenarioCount=new Label(),vehicleCount=new Label();ProgressBar loadingBar=new ProgressBar();TableLayoutPanel launchLayout;ModernButton detailSelectionButton,compatibilityDiagnosticButton;Button[] launchButtons=new Button[3];List<CatalogItem> sc=new List<CatalogItem>(),vc=new List<CatalogItem>();int scanGeneration;CancellationTokenSource scanCancellation;bool filtering,audioDiagnosticRunning;int activeBveProcesses;bool gameQuietMode,pendingScanAfterGame;readonly BveGameplayActivity bveActivity=new BveGameplayActivity();
+  CancellationTokenSource audioDiagnosticCancellation,pcmStageCancellation;
+  bool launchInProgress;
+  public Launcher(bool startServices=true){Icon=new Icon(Path.Combine(Program.Home,"launcher.ico"));Text="BVE 起動ランチャー Ver."+Release.Display;Size=new Size(1600,990);MinimumSize=new Size(960,680);Font=new Font("Yu Gothic UI",10);StartPosition=FormStartPosition.CenterScreen;
   BackColor=Color.FromArgb(245,248,252);var layout=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=1,RowCount=6,Padding=new Padding(17,10,17,12),BackColor=Color.FromArgb(245,248,252)};Controls.Add(layout);foreach(int h in new[]{56,55,52})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,h));layout.RowStyles.Add(new RowStyle(SizeType.Percent,100));foreach(int h in new[]{140,132})layout.RowStyles.Add(new RowStyle(SizeType.Absolute,h));
   var header=new Panel{Dock=DockStyle.Fill,BackColor=Color.White,Margin=new Padding(0,0,0,7)};var appIcon=new PictureBox{Image=LoadHeaderLogo(),SizeMode=PictureBoxSizeMode.Zoom,Location=new Point(12,4),Size=new Size(34,34)};header.Controls.Add(appIcon);header.Controls.Add(new Label{Text="BVE 起動ランチャー",Font=new Font(Font.FontFamily,15,FontStyle.Bold),ForeColor=Color.FromArgb(27,48,77),Location=new Point(56,5),AutoSize=true});header.Controls.Add(new Label{Text="Ver."+Release.Display,ForeColor=Color.FromArgb(105,120,139),Location=new Point(265,10),AutoSize=true});Caption(header);layout.Controls.Add(header);
-  var folder=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=4};folder.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,130));folder.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));folder.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,150));folder.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,90));folder.Controls.Add(new Label{Text="シナリオフォルダ",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft},0,0);root.Text=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),"BveTs","Scenarios");root.Dock=DockStyle.Fill;folder.Controls.Add(root,1,0);var browse=new ModernButton{Text="フォルダを選ぶ",Symbol="folder",Dock=DockStyle.Fill};folder.Controls.Add(browse,2,0);var reload=new ModernButton{Text="更新",Symbol="refresh",Dock=DockStyle.Fill};folder.Controls.Add(reload,3,0);reload.Click+=(s,e)=>LoadData();layout.Controls.Add(folder);browse.Click+=(s,e)=>{using(var d=new FolderBrowserDialog()){d.SelectedPath=root.Text;if(d.ShowDialog()==DialogResult.OK){root.Text=d.SelectedPath;LoadData();}}};
+   var folder=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=5};folder.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,130));folder.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));folder.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,150));folder.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,145));folder.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,90));folder.Controls.Add(new Label{Text="シナリオフォルダ",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft},0,0);root.Text=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),"BveTs","Scenarios");root.Dock=DockStyle.Fill;folder.Controls.Add(root,1,0);var browse=new ModernButton{Text="フォルダを選ぶ",Symbol="folder",Dock=DockStyle.Fill};folder.Controls.Add(browse,2,0);compatibilityDiagnosticButton=new ModernButton{Text="音声形式を診断",Symbol="document",Dock=DockStyle.Fill,Enabled=false};new ToolTip().SetToolTip(compatibilityDiagnosticButton,"選択中のシナリオ・車両にあるWAVのDSOAL互換性を、BVEを起動せずに確認します。");compatibilityDiagnosticButton.Click+=(s,e)=>ShowCompatibilityReport();folder.Controls.Add(compatibilityDiagnosticButton,3,0);var reload=new ModernButton{Text="更新",Symbol="refresh",Dock=DockStyle.Fill};folder.Controls.Add(reload,4,0);reload.Click+=(s,e)=>LoadData();layout.Controls.Add(folder);browse.Click+=(s,e)=>{using(var d=new FolderBrowserDialog()){d.SelectedPath=root.Text;if(d.ShowDialog()==DialogResult.OK){root.Text=d.SelectedPath;LoadData();}}};
   var searches=Columns();searches.Controls.Add(SearchBox("路線を検索",search));searches.Controls.Add(SearchBox("車両を検索",vehicleSearch));layout.Controls.Add(searches);search.TextChanged+=(s,e)=>Filter();vehicleSearch.TextChanged+=(s,e)=>Filter();
   var lists=Columns();scenarios.Dock=vehicles.Dock=DockStyle.Fill;vehicles.ShowVehicleLocation=true;scenarios.AccessibleName="路線・シナリオ一覧";vehicles.AccessibleName="車両・編成一覧";lists.Controls.Add(Group("路線・シナリオ一覧",scenarios));lists.Controls.Add(Group("車両・編成一覧（パネル画像）",vehicles));layout.Controls.Add(lists);
   var details=Columns();foreach(var box in new[]{scenarioInfo,vehicleInfo}){box.Dock=DockStyle.Fill;box.BackColor=Color.White;}details.Controls.Add(Group("選択したシナリオ",DetailPanel(scenarioPicture,scenarioInfo)));details.Controls.Add(Group("使用する車両",DetailPanel(vehiclePicture,vehicleInfo)));layout.Controls.Add(details);
   scenarios.SelectionChanged+=(s,e)=>{if(!filtering)vehicles.ClearSelection();RefreshSelection();};vehicles.SelectionChanged+=(s,e)=>{if(!filtering)RefreshSelection();};
   bveActivity.Changed+=(running)=>SetGameQuietMode(running);exe.Text=BveLocator.Resolve(6)??"";exe5.Text=BveLocator.Resolve(5)??"";var statusPanel=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,BackColor=Color.White,Margin=new Padding(4,3,2,3),Padding=new Padding(10,4,10,4)};statusPanel.RowStyles.Add(new RowStyle(SizeType.Percent,100));statusPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));statusPanel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,250));status.Dock=DockStyle.Fill;status.Text="一覧を読み込みます。";status.TextAlign=ContentAlignment.MiddleLeft;statusPanel.Controls.Add(status,0,0);loadingBar.Dock=DockStyle.Fill;loadingBar.Style=ProgressBarStyle.Marquee;loadingBar.MarqueeAnimationSpeed=25;loadingBar.AccessibleName="読み込み進捗";loadingBar.Visible=false;statusPanel.Controls.Add(loadingBar,1,0);
   var bottom=new TableLayoutPanel{Dock=DockStyle.Fill,RowCount=3,ColumnCount=1,Margin=new Padding(0)};bottom.RowStyles.Add(new RowStyle(SizeType.Absolute,59));bottom.RowStyles.Add(new RowStyle(SizeType.Percent,100));bottom.RowStyles.Add(new RowStyle(SizeType.Absolute,44));var modes=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=3,Margin=new Padding(0,3,0,3)};launchLayout=modes;for(int i=0;i<3;i++)modes.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100f/3));string[] names={"BVE6 互換起動","BVE6 通常起動","BVE5 通常起動"};for(int i=0;i<3;i++){int selectedMode=i;var button=new ModernButton{Text=names[i],Symbol="play",Emphasized=false,Dock=DockStyle.Fill,Font=new Font(Font,FontStyle.Bold),BackColor=i==0?Color.FromArgb(18,119,103):Color.FromArgb(31,102,181),ForeColor=Color.White,Margin=new Padding(4),Cursor=Cursors.Hand};button.FlatAppearance.BorderSize=0;button.Click+=(s,e)=>Start(selectedMode);launchButtons[i]=button;modes.Controls.Add(button,i,0);}bottom.Controls.Add(modes,0,0);var actions=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=5,RowCount=1,Margin=new Padding(0)};actions.RowStyles.Add(new RowStyle(SizeType.Percent,100));foreach(int w in new[]{175,246,210,120})actions.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,w));actions.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));var clear=new ModernButton{Text="車両選択を解除",Symbol="document",Dock=DockStyle.Fill};clear.Click+=(s,e)=>{vehicles.ClearSelection();RefreshSelection();};actions.Controls.Add(clear);var register=new ModernButton{Text="MotorMasterファイルを選ぶ",Symbol="image",Dock=DockStyle.Fill};register.Click+=(s,e)=>RegisterExtra();actions.Controls.Add(register);var motorState=new Label{AutoSize=true,Padding=new Padding(8,7,8,0)};actions.Controls.Add(motorState);var settings=new ModernButton{Text="設定",Symbol="dots",Dock=DockStyle.Fill};settings.Click+=(s,e)=>ShowSettings();actions.Controls.Add(settings);statusPanel.ColumnStyles[1].Width=70;actions.Controls.Add(statusPanel,4,0);bottom.Controls.Add(actions,0,2);layout.Controls.Add(bottom);if(startServices)Shown+=(s,e)=>{bveActivity.Start();LoadData();AutoUpdate.Check(this);};FormClosed+=(s,e)=>{bveActivity.Dispose();if(scanCancellation!=null)scanCancellation.Cancel();if(scenarioPicture.Image!=null)scenarioPicture.Image.Dispose();if(vehiclePicture.Image!=null)vehiclePicture.Image.Dispose();if(appIcon.Image!=null)appIcon.Image.Dispose();};RefreshSelection();Action refreshMotor=()=>{motorState.Text=MotorMasterFix.IsRegistered()?"MotorMaster: 読み込み済み ✓":"MotorMaster: 未登録";motorState.ForeColor=MotorMasterFix.IsRegistered()?Color.FromArgb(18,115,79):Color.FromArgb(140,82,38);};refreshMotor();register.Click+=(s,e)=>refreshMotor();
-  AddDetailedSelectionButton(actions,statusPanel);
+   FormClosing+=(sender,args)=>{
+    if(audioDiagnosticCancellation!=null)audioDiagnosticCancellation.Cancel();
+    if(pcmStageCancellation!=null)pcmStageCancellation.Cancel();
+   };
+   AddDetailedSelectionButton(actions,statusPanel);
  }
  void AddDetailedSelectionButton(TableLayoutPanel actions,Control statusContainer){
   actions.Controls.Remove(statusContainer);
@@ -295,6 +313,64 @@ internal sealed class Launcher:ModernWindow {
    }
   }catch(Exception ex){Diagnostics.Error("SCENARIO_DETAILS",ex);MessageBox.Show(this,"候補一覧を表示できませんでした。\n"+ex.Message,"詳細選択",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
  }
+  async void ShowCompatibilityReport(){
+   if(audioDiagnosticRunning){
+    if(audioDiagnosticCancellation!=null)audioDiagnosticCancellation.Cancel();
+    status.Text="音声形式の診断を中止しています…";
+    return;
+   }
+   var scenario=Selected(scenarios);
+   var vehicle=Selected(vehicles);
+   if(scenario==null){MessageBox.Show(this,"診断するシナリオを左の一覧から選んでください。","音声形式の診断",MessageBoxButtons.OK,MessageBoxIcon.Information);return;}
+   if(gameQuietMode || bveActivity.IsRunning || Process.GetProcessesByName("BveTs").Length>0){
+    MessageBox.Show(this,"BVE運転中はディスク負荷を避けるため診断しません。運転終了後に再度お試しください。","音声形式の診断",MessageBoxButtons.OK,MessageBoxIcon.Information);return;
+   }
+   audioDiagnosticRunning=true;
+   var cancellation=new CancellationTokenSource();
+   audioDiagnosticCancellation=cancellation;
+   compatibilityDiagnosticButton.Text="診断を中止";
+   compatibilityDiagnosticButton.Enabled=true;
+   SetLaunchEnabled(false);
+   if(detailSelectionButton!=null)detailSelectionButton.Enabled=false;
+   try{
+    string scenarioPath=scenario.Path;
+    string vehiclePath=vehicle==null?null:vehicle.Path;
+    bool background=BveWindowOptions.Read(6).BackgroundAudio;
+    status.Text="音声の形式を読み取り専用で診断しています…";
+    var check=await Task.Run(()=>BveDsoalCompatibility.InspectScenario(scenarioPath,vehiclePath,cancellation.Token),cancellation.Token);
+    cancellation.Token.ThrowIfCancellationRequested();
+    if(IsDisposed)return;
+    if(bveActivity.IsRunning || Process.GetProcessesByName("BveTs").Length>0){
+     status.Text="BVEの運転開始を検出したため診断結果の表示を中止しました。";
+     return;
+    }
+    string report=BveDsoalCompatibility.FormatReport(check,scenarioPath,background);
+    Diagnostics.Write("DSOAL_MANUAL_DIAGNOSTIC","known="+check.IsKnown+" references="+check.TotalReferences+" unsupported="+check.UnsupportedReferences+" reason="+(check.UnknownReason??""));
+    status.Text=check.IsKnown ? "音声形式の診断が終了しました。結果を確認してください。" : "音声形式は判定できませんでした。理由を確認してください。";
+    using(var dialog=new Form{Text="BVE6 音声形式の互換性診断",Size=new Size(850,630),MinimumSize=new Size(540,380),StartPosition=FormStartPosition.CenterParent,Font=new Font("Yu Gothic UI",10),BackColor=Color.White}){
+     var body=new TextBox{Text=report,Multiline=true,ReadOnly=true,ScrollBars=ScrollBars.Both,WordWrap=false,Dock=DockStyle.Fill,BackColor=Color.White,Font=new Font("Yu Gothic UI",10)};
+     var buttons=new FlowLayoutPanel{Dock=DockStyle.Bottom,Height=52,FlowDirection=FlowDirection.RightToLeft,Padding=new Padding(8)};
+     var close=new Button{Text="閉じる",Width=100,Height=32,DialogResult=DialogResult.OK};
+     var copy=new Button{Text="結果をコピー",Width=140,Height=32};
+     copy.Click+=(sender,args)=>{try{Clipboard.SetText(report);status.Text="診断結果をクリップボードにコピーしました。";}catch(Exception ex){MessageBox.Show(dialog,"コピーできませんでした: "+ex.Message,"音声形式の診断");}};
+     buttons.Controls.Add(close);buttons.Controls.Add(copy);
+     dialog.Controls.Add(body);dialog.Controls.Add(buttons);dialog.AcceptButton=close;
+     dialog.ShowDialog(this);
+    }
+   }catch(OperationCanceledException){if(!IsDisposed){status.Text="音声形式の診断を中止しました。";Diagnostics.Write("DSOAL_MANUAL_DIAGNOSTIC_CANCEL","read-only inspection cancelled");}}
+   catch(Exception ex){Diagnostics.Error("DSOAL_MANUAL_DIAGNOSTIC_ERROR",ex);if(!IsDisposed){status.Text="音声形式の診断を完了できませんでした。";MessageBox.Show(this,"診断中に問題が発生しました。\n"+ex.Message,"音声形式の診断",MessageBoxButtons.OK,MessageBoxIcon.Warning);}}
+   finally{
+    audioDiagnosticCancellation=null;
+    cancellation.Dispose();
+    audioDiagnosticRunning=false;
+    if(!IsDisposed){
+     compatibilityDiagnosticButton.Text="音声形式を診断";
+     compatibilityDiagnosticButton.Enabled=scenarios.SelectedItem!=null;
+     SetLaunchEnabled(true);
+     if(detailSelectionButton!=null)detailSelectionButton.Enabled=scenarios.SelectedItem!=null;
+    }
+   }
+  }
  static Image LoadHeaderLogo(){using(var stream=System.Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("launcher-icon.png")){if(stream==null)return null;using(var image=Image.FromStream(stream))return new Bitmap(image);}}
  TableLayoutPanel Columns(){var panel=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=new Padding(0)};panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,50));panel.RowStyles.Add(new RowStyle(SizeType.Percent,100));return panel;}
  Control Group(string title,Control child){var card=new Panel{Dock=DockStyle.Fill,BackColor=Color.FromArgb(224,231,242),Padding=new Padding(1),Margin=new Padding(3)};child.Dock=DockStyle.Fill;card.Controls.Add(child);var heading=new TableLayoutPanel{Dock=DockStyle.Top,Height=34,ColumnCount=2,RowCount=1,BackColor=Color.FromArgb(238,244,251),Margin=new Padding(0)};heading.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));heading.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,70));heading.RowStyles.Add(new RowStyle(SizeType.Percent,100));var logo=UiDrawing.Train();var label=new Label{Text="      "+title,Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,Image=logo,ImageAlign=ContentAlignment.MiddleLeft,ForeColor=Color.FromArgb(38,62,94),Font=new Font(Font,FontStyle.Bold)};heading.Controls.Add(label,0,0);Label count=child==scenarios?scenarioCount:child==vehicles?vehicleCount:null;if(count!=null){count.Dock=DockStyle.Fill;count.TextAlign=ContentAlignment.MiddleRight;count.ForeColor=Color.SlateGray;heading.Controls.Add(count,1,0);}card.Controls.Add(heading);card.Disposed+=(s,e)=>logo.Dispose();return card;}
@@ -373,7 +449,7 @@ internal sealed class Launcher:ModernWindow {
  }
  Control SearchBox(string label,TextBox box){var panel=new TableLayoutPanel{Dock=DockStyle.Fill,ColumnCount=2,RowCount=1,Margin=new Padding(3,1,3,1)};panel.RowStyles.Add(new RowStyle(SizeType.Percent,100));panel.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute,112));panel.ColumnStyles.Add(new ColumnStyle(SizeType.Percent,100));panel.Controls.Add(new Label{Text=label,Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleLeft,Font=new Font(Font,FontStyle.Bold)},0,0);panel.Controls.Add(new SearchField(box,label){Dock=DockStyle.Fill},1,0);return panel;}
  Program.Entry Selected(CatalogView view){return view.SelectedItem==null?null:view.SelectedItem.Entry;}
- void RefreshSelection(){vehicleInfo.BackColor=Color.White;var scenario=scenarios.SelectedItem;var vehicle=vehicles.SelectedItem;if(detailSelectionButton!=null)detailSelectionButton.Enabled=scenario!=null;scenarioInfo.Text=scenario==null?"左の一覧からシナリオを選んでください。":scenario.Title+Environment.NewLine+DisplayVersion(scenario)+(String.IsNullOrWhiteSpace(scenario.DisplayGroup)?"":"  ·  "+scenario.DisplayGroup)+Environment.NewLine+Path.GetFileName(scenario.Entry.Path);string defaultVehicle=null;
+ void RefreshSelection(){vehicleInfo.BackColor=Color.White;var scenario=scenarios.SelectedItem;var vehicle=vehicles.SelectedItem;if(detailSelectionButton!=null)detailSelectionButton.Enabled=scenario!=null&&!audioDiagnosticRunning;if(compatibilityDiagnosticButton!=null)compatibilityDiagnosticButton.Enabled=scenario!=null||audioDiagnosticRunning;scenarioInfo.Text=scenario==null?"左の一覧からシナリオを選んでください。":scenario.Title+Environment.NewLine+DisplayVersion(scenario)+(String.IsNullOrWhiteSpace(scenario.DisplayGroup)?"":"  ·  "+scenario.DisplayGroup)+Environment.NewLine+Path.GetFileName(scenario.Entry.Path);string defaultVehicle=null;
   if(vehicle!=null)vehicleInfo.Text=vehicle.Title+Environment.NewLine+DisplayVersion(vehicle)+"  ·  "+Path.GetFileName(vehicle.Entry.Path)+Environment.NewLine+"保存場所: "+Path.GetDirectoryName(vehicle.Entry.Path);
   else if(scenario!=null){try{string raw=Program.Value(Program.Read(scenario.Entry.Path),"Vehicle");bool random=ScenarioChoices.IsRandom(raw);defaultVehicle=random?null:Program.DefaultVehicle(scenario.Entry.Path);vehicleInfo.Text=random?"車両ランダム（シナリオ内で指定された車両）":defaultVehicle==null?"この路線の指定車両は見つかりません。右の一覧から使用する車両を選んでください。":"シナリオ指定"+Environment.NewLine+Path.GetFileName(defaultVehicle)+Environment.NewLine+"保存場所: "+Path.GetDirectoryName(defaultVehicle);vehicleInfo.BackColor=defaultVehicle==null&&!random?Color.MistyRose:Color.White;}catch(Exception ex){vehicleInfo.Text="車両の確認に失敗しました："+ex.Message;}}
   else vehicleInfo.Text="車両を選ばなければ、シナリオに指定された車両を使います。";vehicles.SetDefault(defaultVehicle);
@@ -408,6 +484,7 @@ internal sealed class Launcher:ModernWindow {
  // Do not change the BVE process, OS priority, frame limit or driver configuration.
  void SetGameQuietMode(bool gameRunning){
   bool pause=gameRunning || Interlocked.CompareExchange(ref activeBveProcesses,0,0)>0;
+  if(pause && audioDiagnosticCancellation!=null)audioDiagnosticCancellation.Cancel();
   scenarios.SetThumbnailLoadingPaused(pause);
   vehicles.SetThumbnailLoadingPaused(pause);
   if(gameQuietMode==pause)return;
@@ -428,7 +505,7 @@ internal sealed class Launcher:ModernWindow {
    if(pendingScanAfterGame){pendingScanAfterGame=false;LoadData();}
   }
  }
- void SetLaunchEnabled(bool enabled){foreach(var button in launchButtons)if(button!=null)button.Enabled=enabled;}
+ void SetLaunchEnabled(bool enabled){foreach(var button in launchButtons)if(button!=null)button.Enabled=enabled&&!audioDiagnosticRunning;}
  sealed class ScanProgress {public int Done,Total;public string Phase;}
  void Busy(string message){status.Text=message;loadingBar.Style=ProgressBarStyle.Marquee;loadingBar.MarqueeAnimationSpeed=25;loadingBar.Visible=true;}
  void Idle(){loadingBar.Visible=false;loadingBar.MarqueeAnimationSpeed=0;}
@@ -489,5 +566,114 @@ internal sealed class Launcher:ModernWindow {
     internal static bool NeedsLegacy(string scenario){
       try{string vehicle=Program.DefaultVehicle(scenario);if(vehicle==null)return false;string dir=Path.GetDirectoryName(vehicle);foreach(string file in new[]{Path.Combine(dir,"VehiclePluginUsing.xml"),Path.ChangeExtension(vehicle,".VehiclePluginUsing.xml")}){if(File.Exists(file)&&XDocument.Load(file).Root.Name.LocalName=="AtsExPluginUsing")return true;}}catch(Exception ex){Diagnostics.Write("LEGACY_CHECK",ex.Message);}return false;
     }
-    async void Start(int mode,string scenarioFromDetails=null,string vehicleFromDetails=null,string routeFromDetails=null,bool fromDetails=false){if(scanCancellation!=null){scanCancellation.Cancel();scanGeneration++;}SetLaunchEnabled(false);try{var s=Selected(scenarios);var v=Selected(vehicles);string scenarioPath=fromDetails?scenarioFromDetails:(s==null?null:s.Path);string vehiclePath=fromDetails?vehicleFromDetails:(v==null?null:v.Path);if(String.IsNullOrWhiteSpace(scenarioPath))throw new InvalidOperationException("左側の一覧からシナリオを選んでください。");bool bve5=mode==2; bool compat=mode==0; string executable=bve5?exe5.Text:exe.Text; if(!File.Exists(executable)||Program.Machine(executable)!=(bve5?0x14c:0x8664))throw new InvalidOperationException((bve5?"BVE5":"BVE6")+"の本体を指定してください。");if(Process.GetProcessesByName("BveTs").Any(p=>{try{return p.MainModule.FileName.Equals(executable,StringComparison.OrdinalIgnoreCase);}catch{return true;}}))throw new InvalidOperationException("起動中のBVEを終了してから、もう一度押してください。");Busy("起動用データを準備しています。必要なら作業コピーを作ります…");Diagnostics.Write("PREPARE","scenario="+scenarioPath+" vehicle="+(vehiclePath??"(scenario default)")+" route="+(routeFromDetails??"(scenario default)"));var ready=await Task.Run(()=>(compat?Program.Prepare(scenarioPath,vehiclePath,routeFromDetails):Program.PrepareNormal(scenarioPath,vehiclePath,routeFromDetails,bve5)));if(ready.Warnings.Count>0){string warning=String.Join(Environment.NewLine,ready.Warnings.ToArray());File.WriteAllText(Path.Combine(Path.GetDirectoryName(ready.Scenario),"不足ファイル.txt"),warning,Encoding.UTF8);Diagnostics.Write("MISSING_OPTIONAL_FILES",warning);if(MessageBox.Show(this,"次のファイルが見つかりません。該当する音声・画像なしで起動しますか？\n元のデータは変更していません。\n\n"+String.Join("\n",ready.Warnings.Take(12).ToArray())+(ready.Warnings.Count>12?"\nほか "+(ready.Warnings.Count-12)+" 件。詳細は最新ログを確認してください。":""),"不足ファイルの確認",MessageBoxButtons.YesNo,MessageBoxIcon.Warning)!=DialogResult.Yes)return;}Diagnostics.CurrentRun=Path.GetDirectoryName(ready.Scenario);Diagnostics.Write("PREPARED","scenario="+ready.Scenario+" ATS="+ready.Ats+" mode="+ready.Mode+" bridgeLog="+ready.Log);var start=new ProcessStartInfo(executable,"\""+ready.Scenario+"\""+(NeedsLegacy(ready.Scenario)?" /legacy":"")){UseShellExecute=false,WorkingDirectory=Path.GetDirectoryName(executable)};start.EnvironmentVariables.Remove("BVE5COMPAT_ATS");start.EnvironmentVariables.Remove("BVE5COMPAT_LOG");start.EnvironmentVariables.Remove("BVE5COMPAT_WORKDIR");start.EnvironmentVariables.Remove("BVE5COMPAT_PROFILE");if(ready.Mode.StartsWith("32bit")){start.EnvironmentVariables["BVE5COMPAT_ATS"]=ready.Ats;start.EnvironmentVariables["BVE5COMPAT_LOG"]=ready.Log;start.EnvironmentVariables["BVE5COMPAT_WORKDIR"]=ready.Work;start.EnvironmentVariables["BVE5COMPAT_PROFILE"]="0";}var bveProcess=BveBackgroundAudio.Start(start,bve5?5:6);if(bveProcess==null)throw new IOException("BVEプロセスを開始できませんでした。");if(Interlocked.Increment(ref activeBveProcesses)==1)SetGameQuietMode(true);Diagnostics.Write("BVE_STARTED","pid="+bveProcess.Id+" exe="+start.FileName);try{BveLaunchDisplay.ArrangeWhenReady(bveProcess.Id,bve5?5:6);}catch(Exception screenEx){Diagnostics.Write("BVE_MONITOR",screenEx.Message);}bveProcess.Exited+=(sender,args)=>{try{Diagnostics.Write("BVE_EXIT","pid="+bveProcess.Id+" exitCode="+bveProcess.ExitCode+" bridgeLogExists="+File.Exists(ready.Log));}catch(Exception ex){Diagnostics.Error("EXIT_LOG_ERROR",ex);}finally{bveProcess.Dispose();if(Interlocked.Decrement(ref activeBveProcesses)==0){try{if(!IsDisposed&&IsHandleCreated)BeginInvoke((Action)(()=>{if(IsDisposed)return;bveActivity.Check();SetGameQuietMode(bveActivity.IsRunning);}));}catch(InvalidOperationException){}}}};bveProcess.EnableRaisingEvents=true;status.Text=(bve5?"BVE5":"BVE6")+"を起動しました。"+ready.Mode+"。実際の動作は未確認です。";}catch(Exception e){Diagnostics.Error("LAUNCH_ERROR",e);status.Text=e.Message;MessageBox.Show(this,e.Message,"起動準備を確認してください");}finally{Idle();SetLaunchEnabled(true);}}
+    // Called only when the BVE6 background-audio opt-in is enabled and
+    // preflight found an unsupported or unknown WAV format.
+    bool ConfirmNativeAudioFallback(BveDsoalCompatibility.Check check){
+      string reason=check.IsKnown
+        ? "この車両のSound.txtには、DSOALで読み込めない24/32bit整数PCM音声の参照が"+
+          check.UnsupportedReferences+"件あります。\n"+(check.FirstExample??"")
+        : "この車両の音声形式を確認できませんでした。\n"+(check.UnknownReason??"");
+      string message=reason+
+        "\n\n今回だけBVE標準のDirectSound方式で起動しますか？"+
+        "\n保存したバックグラウンド音声設定、元の音声・車両・ATSファイルは変更しません。"+
+        "\nただし、別ウィンドウ操作中の音声維持は利用できなくなります。"+
+        "\n\n［はい］今回だけ標準音声で起動　［いいえ］起動を中止";
+      return MessageBox.Show(this,message,"音声の互換性を確認",
+        MessageBoxButtons.YesNo,MessageBoxIcon.Warning,
+        MessageBoxDefaultButton.Button2)==DialogResult.Yes;
+    }
+    async void Start(int mode,string scenarioFromDetails=null,string vehicleFromDetails=null,string routeFromDetails=null,bool fromDetails=false){if(launchInProgress)return;launchInProgress=true;if(scanCancellation!=null){scanCancellation.Cancel();scanGeneration++;}SetLaunchEnabled(false);try{var s=Selected(scenarios);var v=Selected(vehicles);string scenarioPath=fromDetails?scenarioFromDetails:(s==null?null:s.Path);string vehiclePath=fromDetails?vehicleFromDetails:(v==null?null:v.Path);if(String.IsNullOrWhiteSpace(scenarioPath))throw new InvalidOperationException("左側の一覧からシナリオを選んでください。");bool bve5=mode==2; bool compat=mode==0; string executable=bve5?exe5.Text:exe.Text; if(!File.Exists(executable)||Program.Machine(executable)!=(bve5?0x14c:0x8664))throw new InvalidOperationException((bve5?"BVE5":"BVE6")+"の本体を指定してください。");if(Process.GetProcessesByName("BveTs").Any(p=>{try{return p.MainModule.FileName.Equals(executable,StringComparison.OrdinalIgnoreCase);}catch{return true;}}))throw new InvalidOperationException("起動中のBVEを終了してから、もう一度押してください。");Busy("起動用データを準備しています。必要なら作業コピーを作ります…");Diagnostics.Write("PREPARE","scenario="+scenarioPath+" vehicle="+(vehiclePath??"(scenario default)")+" route="+(routeFromDetails??"(scenario default)"));var ready=await Task.Run(()=>(compat?Program.Prepare(scenarioPath,vehiclePath,routeFromDetails):Program.PrepareNormal(scenarioPath,vehiclePath,routeFromDetails,bve5)));if(ready.Warnings.Count>0){string warning=String.Join(Environment.NewLine,ready.Warnings.ToArray());File.WriteAllText(Path.Combine(Path.GetDirectoryName(ready.Scenario),"不足ファイル.txt"),warning,Encoding.UTF8);Diagnostics.Write("MISSING_OPTIONAL_FILES",warning);if(MessageBox.Show(this,"次のファイルが見つかりません。該当する音声・画像なしで起動しますか？\n元のデータは変更していません。\n\n"+String.Join("\n",ready.Warnings.Take(12).ToArray())+(ready.Warnings.Count>12?"\nほか "+(ready.Warnings.Count-12)+" 件。詳細は最新ログを確認してください。":""),"不足ファイルの確認",MessageBoxButtons.YesNo,MessageBoxIcon.Warning)!=DialogResult.Yes)return;}Diagnostics.CurrentRun=Path.GetDirectoryName(ready.Scenario);Diagnostics.Write("PREPARED","scenario="+ready.Scenario+" ATS="+ready.Ats+" mode="+ready.Mode+" bridgeLog="+ready.Log);var start=new ProcessStartInfo(executable,"\""+ready.Scenario+"\""+(NeedsLegacy(ready.Scenario)?" /legacy":"")){UseShellExecute=false,WorkingDirectory=Path.GetDirectoryName(executable)};start.EnvironmentVariables.Remove("BVE5COMPAT_ATS");start.EnvironmentVariables.Remove("BVE5COMPAT_LOG");start.EnvironmentVariables.Remove("BVE5COMPAT_WORKDIR");start.EnvironmentVariables.Remove("BVE5COMPAT_PROFILE");if(ready.Mode.StartsWith("32bit")){start.EnvironmentVariables["BVE5COMPAT_ATS"]=ready.Ats;start.EnvironmentVariables["BVE5COMPAT_LOG"]=ready.Log;start.EnvironmentVariables["BVE5COMPAT_WORKDIR"]=ready.Work;start.EnvironmentVariables["BVE5COMPAT_PROFILE"]="0";}bool nativeAudioOnlyThisTime=false;
+if(!bve5 && BveWindowOptions.Read(6).BackgroundAudio){
+  var audioCheck=await Task.Run(()=>BveDsoalCompatibility.InspectScenario(ready.Scenario));
+  Diagnostics.Write("DSOAL_FORMAT_PREFLIGHT",
+    "known="+audioCheck.IsKnown+
+    " references="+audioCheck.TotalReferences+
+    " unique="+audioCheck.UniqueWavFiles+
+    " unsupported="+audioCheck.UnsupportedReferences+
+    " unsupportedUnique="+audioCheck.UnsupportedUniqueFiles+
+    " reason="+(audioCheck.UnknownReason??""));
+   if(BveDsoalCompatibility.NeedsAutomaticPcmStaging(bve5,compat,true,audioCheck)){
+     try {
+      if(Process.GetProcessesByName("BveTs").Any())
+        throw new InvalidOperationException("BVEの運転中は音声コピーを変換しません。");
+      Busy("24/32bit整数PCMを一時的な32bit浮動小数点WAVに変換しています…");
+      using(var cancellation=new CancellationTokenSource()){
+       pcmStageCancellation=cancellation;
+       using(var monitor=new System.Windows.Forms.Timer{Interval=300}){
+        monitor.Tick+=(sender,args)=>{
+          if(!IsDisposed && Process.GetProcessesByName("BveTs").Any())cancellation.Cancel();
+        };
+        monitor.Start();
+        try{
+          var staged=await Task.Run(()=>BvePcmFloatStaging.StagePreparedScenario(
+           ready.Scenario,cancellation.Token),cancellation.Token);
+         cancellation.Token.ThrowIfCancellationRequested();
+         if(IsDisposed||Disposing)throw new OperationCanceledException();
+          if(Process.GetProcessesByName("BveTs").Any())
+           throw new InvalidOperationException("変換中にBVEが起動したため、この起動は中止しました。");
+          var verified=await Task.Run(()=>BveDsoalCompatibility.InspectScenario(
+           staged.ScenarioFile,null,cancellation.Token),cancellation.Token);
+          cancellation.Token.ThrowIfCancellationRequested();
+          if(IsDisposed||Disposing)throw new OperationCanceledException();
+          if(Process.GetProcessesByName("BveTs").Any())
+           throw new InvalidOperationException("再検査中にBVEが起動したため、この起動は中止しました。");
+          if(!verified.IsKnown || verified.UnsupportedReferences!=0 ||
+             verified.TotalReferences!=audioCheck.TotalReferences ||
+             verified.UniqueWavFiles!=audioCheck.UniqueWavFiles)
+           throw new InvalidDataException("変換後の音声参照を再確認できないためBVEを起動しません。"+
+             (verified.UnknownReason??""));
+           Diagnostics.Write("DSOAL_PCM_AUTO_STAGE",
+           "convertedFiles="+staged.ConvertedFiles+" changedReferences="+staged.ChangedReferences+
+           " totalReferences="+verified.TotalReferences+" unsupported="+verified.UnsupportedReferences+
+           " savedSettingsUnchanged=true");
+          ready.Scenario=staged.ScenarioFile;
+          start.Arguments="\""+ready.Scenario+"\""+(NeedsLegacy(ready.Scenario)?" /legacy":"");
+           status.Text="DSOAL用に音声の作業コピーを自動変換しました。元のWAVは変更していません。";
+        }finally{
+         monitor.Stop();
+         pcmStageCancellation=null;
+        }
+       }
+       }
+      }catch(Exception ex) when(ex is IOException || ex is InvalidDataException || ex is UnauthorizedAccessException ||
+                                ex is ArgumentException || ex is NotSupportedException){
+       Diagnostics.Error("DSOAL_PCM_AUTO_STAGE_FAILED",ex);
+       if(IsDisposed || Disposing)throw new OperationCanceledException();
+       if(Process.GetProcessesByName("BveTs").Any())
+         throw new InvalidOperationException("BVE運転中は音声の代替起動をしません。",ex);
+       var fallback=MessageBox.Show(this,
+         "ランチャー側の音声形式を安全に自動変換できませんでした。\n"+ex.Message+
+         "\n\n元のWAV・車両・ATS・設定は変更していません。"+
+         "\n今回だけ標準DirectSoundで起動しますか？"+
+         "\n（バックグラウンド音声は使用できません）",
+         "自動音声互換変換を完了できませんでした",MessageBoxButtons.YesNo,
+         MessageBoxIcon.Warning,MessageBoxDefaultButton.Button2);
+       if(fallback!=DialogResult.Yes){
+         Diagnostics.Write("DSOAL_PCM_AUTO_CANCEL","user declined standard audio after conversion failure");
+         status.Text="音声互換変換が完了できなかったため、起動を中止しました。";
+         return;
+       }
+       nativeAudioOnlyThisTime=true;
+       Diagnostics.Write("DSOAL_NATIVE_FALLBACK","explicit standard DirectSound chosen after PCM staging failure; saved setting unchanged");
+    }
+  }else if(BveDsoalCompatibility.NeedsNativeChoice(audioCheck)){
+    bool nativeApproved=ConfirmNativeAudioFallback(audioCheck);
+    var decision=BveDsoalCompatibility.DecideGui(false,true,audioCheck,nativeApproved);
+    if(decision==BveDsoalCompatibility.GuiDecision.Cancel){
+      Diagnostics.Write("DSOAL_PREFLIGHT_CANCEL","user cancelled before BVE start");
+      status.Text="音声形式の確認により起動を中止しました。";return;
+    }
+    nativeAudioOnlyThisTime=decision==BveDsoalCompatibility.GuiDecision.StandardOnce;
+    Diagnostics.Write("DSOAL_NATIVE_FALLBACK","standard DirectSound chosen for this launch; saved setting unchanged");
+  }
+}
+ // The opt-in DSOAL path already forbids launching while any BVE is running.
+ // Preserve that no-interference guard when the user selects one-shot native.
+ if(nativeAudioOnlyThisTime && Process.GetProcessesByName("BveTs").Any())
+   throw new InvalidOperationException(
+     "別のBVEが起動中です。既存の運転を妨げないため、終了後にもう一度起動してください。");
+ var bveProcess=nativeAudioOnlyThisTime
+  ? BveBackgroundAudio.StartCore(start,6,false,null,
+      Path.Combine(Program.Data,"background-audio-test"))
+  : BveBackgroundAudio.Start(start,bve5?5:6);if(bveProcess==null)throw new IOException("BVEプロセスを開始できませんでした。");if(Interlocked.Increment(ref activeBveProcesses)==1)SetGameQuietMode(true);Diagnostics.Write("BVE_STARTED","pid="+bveProcess.Id+" exe="+start.FileName);try{BveLaunchDisplay.ArrangeWhenReady(bveProcess.Id,bve5?5:6);}catch(Exception screenEx){Diagnostics.Write("BVE_MONITOR",screenEx.Message);}bveProcess.Exited+=(sender,args)=>{try{Diagnostics.Write("BVE_EXIT","pid="+bveProcess.Id+" exitCode="+bveProcess.ExitCode+" bridgeLogExists="+File.Exists(ready.Log));}catch(Exception ex){Diagnostics.Error("EXIT_LOG_ERROR",ex);}finally{bveProcess.Dispose();if(Interlocked.Decrement(ref activeBveProcesses)==0){try{if(!IsDisposed&&IsHandleCreated)BeginInvoke((Action)(()=>{if(IsDisposed)return;bveActivity.Check();SetGameQuietMode(bveActivity.IsRunning);}));}catch(InvalidOperationException){}}}};bveProcess.EnableRaisingEvents=true;status.Text=(bve5?"BVE5":"BVE6")+"を起動しました。"+ready.Mode+"。実際の動作は未確認です。";}catch(OperationCanceledException){if(!IsDisposed&&!Disposing)status.Text="音声変換を中止しました。BVEは起動していません。";}catch(Exception e){Diagnostics.Error("LAUNCH_ERROR",e);if(!IsDisposed&&!Disposing){status.Text=e.Message;MessageBox.Show(this,e.Message,"起動準備を確認してください");}}finally{launchInProgress=false;if(!IsDisposed&&!Disposing){Idle();SetLaunchEnabled(true);}}}
 }

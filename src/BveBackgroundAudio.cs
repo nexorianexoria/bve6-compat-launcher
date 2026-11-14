@@ -21,6 +21,17 @@ internal static class BveBackgroundAudio {
             {"Win64/dsoal-aldrv.dll","D3C64A8CCF531E987132148930DB544FB3F40233218372CF808CB201E7741FEF"}
         };
 
+    // Always keep the copied BVE runtime under a short, stable local path.
+    // A portable research launcher may live deeply under benchmarks/results;
+    // adding BVE's Input Devices\*.dll to that path can exceed the legacy
+    // Win32 MAX_PATH limit and fail with DirectoryNotFoundException even
+    // though the input plugin exists in the original BVE installation.
+    internal static string DefaultRunRoot() {
+        return Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "BVE6互換ランチャー", "background-audio-test");
+    }
+
     private static string Architecture(int version) {
         if(version==5)return "Win32";
         if(version==6)return "Win64";
@@ -134,6 +145,13 @@ internal static class BveBackgroundAudio {
             foreach(var file in SafeFiles(root)) {
                 string relative=file.FullName.Substring(prefix.Length);
                 string dest=Path.Combine(sandbox,relative);
+                // Fail with a clear diagnostic rather than a misleading
+                // "file missing" when a third-party plugin's filename is
+                // too long for legacy .NET/Win32 path handling.
+                if(dest.Length>=248)
+                    throw new PathTooLongException(
+                        "音声用BVEコピーの保存先が長すぎます。"+
+                        "ランチャーを移動するのではなく、短い作業場所が必要です: "+dest);
                 Directory.CreateDirectory(Path.GetDirectoryName(dest));
                 file.CopyTo(dest);
             }
@@ -163,7 +181,7 @@ internal static class BveBackgroundAudio {
     internal static Process Start(ProcessStartInfo start,int version) {
         bool enabled=BveWindowOptions.Read(version).BackgroundAudio;
         return StartCore(start,version,enabled,null,
-            Path.Combine(Program.Data,"background-audio-test"));
+            DefaultRunRoot());
     }
 
     // Explicit arguments permit a live integration test without modifying
@@ -176,7 +194,10 @@ internal static class BveBackgroundAudio {
         if(Process.GetProcessesByName("BveTs").Any())
             throw new InvalidOperationException(
                 "BVEが起動中です。音声試験用BVEを複数起動できません。");
-        CleanupPreviousTestRuns(runRoot);
+        // Previous test sandboxes can contain the only copy of a failing
+        // dsoal-test.log. Never remove them implicitly during another launch.
+        // CleanupPreviousTestRuns is retained for a future *explicit*,
+        // user-controlled maintenance workflow, not called automatically.
         string copy=Stage(version,start.FileName,audioRoot,runRoot);
         string runDir=Path.GetDirectoryName(copy);
         start.FileName=copy;
